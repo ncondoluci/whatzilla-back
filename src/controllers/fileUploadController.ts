@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import { UploadedFile } from 'express-fileupload';
-import { addNewCampaign } from '../providers/campaignService';
+import { addNewCampaign } from '../providers/campaignProvider';
 
 export const uploadCampaignFile = (req: Request, res: Response) => {
     if (!req.files || !req.files.campaignFile) {

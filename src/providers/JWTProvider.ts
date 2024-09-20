@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 
-const JWTProvider = (uid: string = '', role: string = ''): Promise<string | undefined> => {
+const JWTProvider = (uid: string ): Promise<string | undefined> => {
   return new Promise((resolve, reject) => {
-    const payload = { uid, role };
+    const payload = { uid };
 
     jwt.sign(
       payload,
