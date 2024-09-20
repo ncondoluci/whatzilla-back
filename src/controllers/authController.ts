@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
 import User from "../models/User";
 import JWTProvider from "../providers/JWTProvider";
+import bcrypt from 'bcryptjs';
 
-const adminLogin = async ( req: Request, res: Response ) => {
+export const authController = async ( req: Request, res: Response ) => {
     const { email, password } = req.body;
   
     try {
-      // Verificar si el email existe
       const user = await User.findOne({ email });
       
       if (!user) {
@@ -15,7 +15,6 @@ const adminLogin = async ( req: Request, res: Response ) => {
         });
       }
       
-      // Verificar si el usuario está activo
       if (!user.status) {
         return res.status(400).json({
           msg: 'User is not active',
@@ -26,9 +25,10 @@ const adminLogin = async ( req: Request, res: Response ) => {
       
       if (!auth) {
         return res.status(400).json({
-          msg: 'La contraseña no es correcta',
+          msg: 'Wrong password',
         });
       }
+      
       const token = await JWTProvider(user.uid);
       
       res.status(200).json({
@@ -37,10 +37,41 @@ const adminLogin = async ( req: Request, res: Response ) => {
       });
   
     } catch (error) {
-      console.log(error);
+      console.error(error);
   
-      res.status(500).json({
-        msg: 'Algo salió mal.',
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
       });
     }
-  };
+};
+
+export const registrationController = async (req: Request, res: Response) => {
+    const { first_name, last_name, email, password } = req.body;
+
+    console.log("Entrando")
+  
+    try {
+      // Create new user instance
+
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+//     user.password = await bcrypt.hash(user.password, salt);
+      const user = await User.create({ first_name, last_name, email, password: passwordHash });
+  
+      // Return the created user as a JSON response
+      return res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        user,
+      });
+
+    } catch (error) {
+      console.error('Error in createUser service', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+};
