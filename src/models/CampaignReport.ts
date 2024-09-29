@@ -3,6 +3,7 @@ import sequelize from '../config/db';
 import Campaign from './Campaign';
 class CampaignReport extends Model {
     public id!: number;
+    public uid!: string; // UUID
     public campaign_id!: number;
     public status!: 'cancelled' | 'stopped' | 'sent' | 'pending';
     public sent_porcent!: number;
@@ -17,6 +18,12 @@ CampaignReport.init({
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
+    },
+    uid: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        allowNull: false,
+        unique: true,
     },
     campaign_id: {
         type: DataTypes.INTEGER,

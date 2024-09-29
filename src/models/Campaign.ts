@@ -5,6 +5,7 @@ import List from './List';
 
 class Campaign extends Model {
     public id!: number;
+    public uid!: string; // UUID
     public user_id!: number;
     public list_id!: number;
     public name!: string;
@@ -21,6 +22,12 @@ Campaign.init({
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
+    },
+    uid: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        allowNull: false,
+        unique: true,
     },
     user_id: {
         type: DataTypes.INTEGER,

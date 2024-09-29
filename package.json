@@ -23,6 +23,7 @@
     "mysql2": "^3.11.3",
     "sequelize": "^6.37.3",
     "socket.io": "^4.7.5",
+    "tsconfig-paths": "^4.2.0",
     "uuid": "^10.0.0",
     "whatsapp-web.js": "^1.25.0",
     "xlsx": "^0.18.5"

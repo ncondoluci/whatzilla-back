@@ -4,6 +4,7 @@ import User from './User';
 
 class List extends Model {
     public id!: number;
+    public uid!: string; // UUID
     public user_id!: number;  
     public name!: string;
 
@@ -17,6 +18,12 @@ List.init({
         primaryKey: true,
         autoIncrement: true,
     },
+    uid: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        allowNull: false,
+        unique: true,
+      },
     user_id: {
         type: DataTypes.INTEGER,
         allowNull: false,

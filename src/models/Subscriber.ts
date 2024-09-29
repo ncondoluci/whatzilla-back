@@ -4,6 +4,7 @@ import List from './List';
 
 class Subscriber extends Model {
     public id!: number;
+    public uid!: string; // UUID
     public list_id!: number;
     public first_name!: string;
     public last_name!: string;
@@ -20,6 +21,12 @@ Subscriber.init({
         primaryKey: true,
         autoIncrement: true, 
     },
+    uid: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        allowNull: false,
+        unique: true,
+      },
     list_id: {
         type: DataTypes.INTEGER,
         allowNull: false,

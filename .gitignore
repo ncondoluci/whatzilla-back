@@ -5,3 +5,5 @@ uploads/*
 data
 
 package-lock.json
+error.log
+exceptions.log

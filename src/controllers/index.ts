@@ -7,6 +7,10 @@ import { getCampaignList } from './campaignController';
 // Files
 import { uploadCampaignFile } from './fileUploadController';
 
+import {
+    getUser
+} from './userController';
+
 export {
     // Authentication
     authController,
@@ -16,5 +20,8 @@ export {
     getCampaignList,
 
     // Files
-    uploadCampaignFile
+    uploadCampaignFile,
+
+    // User
+    getUser
 };

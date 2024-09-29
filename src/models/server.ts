@@ -61,7 +61,7 @@ class Server {
             console.error('Forced shutdown due to timeout.');
             process.exit(1);  // Force shutdown after 10 seconds if not done
         }, 10000);
-    }    
+    }
     
     constructor() {
         this.app = express();
@@ -149,8 +149,8 @@ class Server {
         this.app.use(this.paths.users, usersRoutes);
 
         // Catch undefined routes
-        this.app.use('*', (req, res, next) => {
-            next(new AppError('Route not found', 404));
+        this.app.use('*', (req: Request, res: Response, next: NextFunction) => {
+            next(new AppError({ message: 'Route not found', statusCode: 404 }));
         });
 
         // Global error handler
