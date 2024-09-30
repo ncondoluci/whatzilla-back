@@ -5,7 +5,7 @@ import User from './User';
 class List extends Model {
     public id!: number;
     public uid!: string; // UUID
-    public user_id!: number;  
+    public user_id!: string;  
     public name!: string;
 
     public readonly createdAt!: Date;
@@ -25,11 +25,11 @@ List.init({
         unique: true,
       },
     user_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: User,
-            key: 'id',
+            key: 'uid',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',

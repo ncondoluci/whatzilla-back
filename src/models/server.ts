@@ -10,12 +10,13 @@ import {
     usersRoutes, 
     campaignsRoutes, 
     filesRoutes, 
-    listsRoutes 
+    listsRoutes,
+    subscribersRoutes    
 } from '../routes';
 
 // Middlewares
 import fileUpload from 'express-fileupload';
-import { globalErrorHandler } from '../middlewares/GlobalErrorHandler';
+import { globalErrorHandler } from '../middlewares/globalErrorHandler';
 
 // Models
 import { dbConnection, closeDBConnection } from './dbConnection';
@@ -38,6 +39,7 @@ class Server {
         files: string;
         lists: string;
         users: string;
+        subscribers: string;
     };
 
     private async shutdown(reason: string) {
@@ -72,7 +74,8 @@ class Server {
             files: '/api/files',
             users: '/api/users',
             campaigns: '/api/campaigns',
-            lists: '/api/lists'
+            lists: '/api/lists',
+            subscribers: '/api/subscribers',
         };
 
         this.server = http.createServer(this.app);
@@ -147,6 +150,7 @@ class Server {
         this.app.use(this.paths.campaigns, campaignsRoutes);
         this.app.use(this.paths.lists, listsRoutes);
         this.app.use(this.paths.users, usersRoutes);
+        this.app.use(this.paths.subscribers, subscribersRoutes);
 
         // Catch undefined routes
         this.app.use('*', (req: Request, res: Response, next: NextFunction) => {

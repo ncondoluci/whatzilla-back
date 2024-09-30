@@ -1,35 +1,30 @@
-const jwt = require('jsonwebtoken');
-const { UsuarioAdmin, Usuario } = require('../models');
+import { Request, Response, NextFunction } from "express";
+import jwt from 'jsonwebtoken';
+import User from "@/models/User";
+import { AppError } from '@/providers/ErrorProvider';
 
-require('dotenv').config();
+export const JWTValidator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const authHeader = req.headers.authorization;
 
-const JWTValidator = async (req, res, next) => {
-  const token = req.header('x-token');
-
-  if (!token) {
-    return res.status(401).json({ error: 'No hay token en la petición' });
-  }
-
-  try {
-    const { uid, rol } = jwt.verify(token, process.env.SECRETPRIVETEKEY);
-
-    let usuario = await UsuarioAdmin.findById(uid);
-
-    usuario ? null : (usuario = await Usuario.findById(uid));
-
-    if (!usuario) {
-      return res
-        .status(401)
-        .json({ error: 'Token no válido - usuario no existe en DB' });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return next(new AppError({ message: 'No token provided', statusCode: 401 }));
     }
 
-    req.usuario = usuario.JWTuser();
-    
-    next();
-  } catch (error) {
-    console.log(error);
-    return res.status(401).json({ error: 'Token inválido' });
-  }
-};
+    const token = authHeader.split(' ')[1];
 
-module.exports = validarJWT;
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET_PRIVATE_KEY!) as { uid: string };
+
+        const user = await User.findOne({ where: { uid: decoded.uid } });
+
+        if (!user) {
+            return next(new AppError({ message: 'Invalid token - user does not exist in DB', statusCode: 401 }));
+        }
+
+        req.user = user.JWTuser();
+
+        next();
+    } catch (error) {
+        return next(new AppError({ message: 'Invalid token', statusCode: 401 }));
+    }
+};

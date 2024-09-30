@@ -3,7 +3,7 @@ import { AppError }     from '../providers/ErrorProvider'; // Import your custom
 import { sendResponse } from '../utils/customResponse';
 import { logger }       from '../utils/logger';
 
-const globalErrorHandler = (err: AppError, req: Request, res: Response, next: NextFunction) => {
+export const globalErrorHandler = (err: AppError, req: Request, res: Response, next: NextFunction) => {
 
     logger.error(err.message, { statusCode: err.statusCode, stack: err.stack });
 
@@ -16,7 +16,6 @@ const globalErrorHandler = (err: AppError, req: Request, res: Response, next: Ne
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     };
 
-    sendResponse(res, statusCode,  errorResponse);
+    sendResponse( res, statusCode,  errorResponse );
 };
 
-export { globalErrorHandler };

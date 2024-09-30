@@ -2,14 +2,14 @@ import sequelize from '../config/db';
 
 const dbConnection = async () => {
     try {
-        await sequelize.authenticate();  // Verify the connection
+        await sequelize.authenticate();
         console.log('Database connection successful');
 
-        if (process.env.NODE_ENV === 'development') {
-            await sequelize.sync({ alter: true, logging: false });
-            console.log('Tables synchronized with alter');
+        if (process.env.DB_SYNC === 'true') {
+            await sequelize.sync({ force: true });
+            console.log('Database synchronized for the first time');
         } else {
-            console.log('Production environment: automatic synchronization is not performed');
+            console.log('Database connected without synchronization');
         }
 
     } catch (error) {

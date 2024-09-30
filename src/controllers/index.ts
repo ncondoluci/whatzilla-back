@@ -1,15 +1,37 @@
 // Authentication
-import { authController, registrationController } from './authController'
+import { authController, registrationController } from '@/controllers/authController'
 
 // Campaigns
-import { getCampaignList } from './campaignController';
+import { 
+    postCampaign,
+    getCampaign,
+    patchCampaign,
+    deleteCampaign
+} from '@/controllers/campaignController';
+
+// Lists
+import {
+    postList,
+    getList,
+    patchList,
+    deleteList
+} from '@/controllers/listController';
 
 // Files
-import { uploadCampaignFile } from './fileUploadController';
+import { uploadCampaignFile } from '@/controllers/fileUploadController';
 
+// Subscribers
+import { 
+    postSubscriber,
+    getSubscriber,
+    patchSubscriber,
+    deleteSubscriber
+} from '@/controllers/subscriberController';
+
+// Users
 import {
     getUser
-} from './userController';
+} from '@/controllers/userController';
 
 export {
     // Authentication
@@ -17,10 +39,25 @@ export {
     registrationController,
 
     // Campaigns
-    getCampaignList,
+    postCampaign,
+    getCampaign,
+    patchCampaign,
+    deleteCampaign,
+
+    // Lists
+    postList,
+    getList,
+    patchList,
+    deleteList,
 
     // Files
     uploadCampaignFile,
+
+    // Subscriber
+    postSubscriber,
+    getSubscriber,
+    patchSubscriber,
+    deleteSubscriber,
 
     // User
     getUser

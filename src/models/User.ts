@@ -13,6 +13,12 @@ class User extends Model {
   // Timestamps
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
+
+  public JWTuser() {
+    return {
+      uid: this.id,
+    };
+  }
 }
 
 User.init({

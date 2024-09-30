@@ -15,19 +15,17 @@ export const validationMiddleware = (req: Request, res: Response, next: NextFunc
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-
         const customErrors: ICustomValidationError[] = errors.array().map((err: ValidationError) => ({
             location: err.location || 'unknown',
             field: err.param,
             message: err.msg
         }));
 
-        const error = new AppError({
+        return next(new AppError({
             message: 'Validation failed',
             statusCode: 400,
             data: { errors: customErrors }
-        });
-        return next(error);
+        }));
     }
 
     next();

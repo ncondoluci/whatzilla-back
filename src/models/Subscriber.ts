@@ -5,7 +5,7 @@ import List from './List';
 class Subscriber extends Model {
     public id!: number;
     public uid!: string; // UUID
-    public list_id!: number;
+    public list_id!: string;
     public first_name!: string;
     public last_name!: string;
     public email!: string;
@@ -28,11 +28,11 @@ Subscriber.init({
         unique: true,
       },
     list_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: List,
-            key: 'id',
+            key: 'uid',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',

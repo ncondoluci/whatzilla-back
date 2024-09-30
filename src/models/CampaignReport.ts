@@ -4,7 +4,7 @@ import Campaign from './Campaign';
 class CampaignReport extends Model {
     public id!: number;
     public uid!: string; // UUID
-    public campaign_id!: number;
+    public campaign_id!: string;
     public status!: 'cancelled' | 'stopped' | 'sent' | 'pending';
     public sent_porcent!: number;
     public run_at!: Date;
@@ -26,11 +26,11 @@ CampaignReport.init({
         unique: true,
     },
     campaign_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: Campaign,
-            key: 'id',
+            key: 'uid',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',

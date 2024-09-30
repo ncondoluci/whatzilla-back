@@ -1,12 +1,49 @@
 import { Router } from "express";
-import { check } from "express-validator";
-import { resultsValidator } from "../middlewares/resultsValidator";
+import { body, param } from "express-validator";
+import { deleteList, getList, patchList, postList } from "@/controllers";
+import { JWTValidator, validationMiddleware } from "@/middlewares";
 
 const router = Router();
 
-// Aquí defines las rutas de campaña
-router.get('/', (req, res) => {
-    res.send('List of lists');
-});
+router.post('/', [
+    JWTValidator,
+    body('name')
+        .not().isEmpty().withMessage('List name must not be empty.')
+        .isString().withMessage('List name must be a string.'),
+    body('user_id')
+        .not().isEmpty().withMessage('User UID must not be empty.')
+        .isString().withMessage('Invalid formar for user_id'),
+    validationMiddleware
+], postList);
+
+router.get('/:uid', [
+    JWTValidator,
+    param('uid')
+        .not().isEmpty().withMessage('List UID must not be empty')
+        .isString().withMessage('Invalid format for list UID'),
+    validationMiddleware
+], getList);
+
+router.patch('/:uid', [
+    JWTValidator,
+    param('uid')
+        .not().isEmpty().withMessage('List UID must not be empty')
+        .isString().withMessage('Invalid format for list UID'),
+    body('name')
+        .optional().not().isEmpty().withMessage('List name must not be empty')
+        .isString().withMessage('List name must be a string'),
+    body('status')
+        .optional().not().isEmpty().withMessage('List status must not be empty.')
+        .isBoolean().withMessage('List status must be boolean type'),
+    validationMiddleware
+], patchList);
+
+router.delete('/:uid', [
+    JWTValidator,
+    param('uid')
+        .not().isEmpty().withMessage('List UID must not be empty')
+        .isString().withMessage('Invalid format for list UID'),
+    validationMiddleware
+], deleteList);
 
 export default router;

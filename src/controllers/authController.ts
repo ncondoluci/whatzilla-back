@@ -3,36 +3,40 @@ import User from "@/models/User";
 import JWTProvider from "@/providers/JWTProvider";
 import bcrypt from 'bcryptjs';
 import { AppError } from "@/providers/ErrorProvider";
+import { sendResponse } from "@/utils/customResponse";
 
 export const authController = async ( req: Request, res: Response, next: NextFunction ) => {
     const { email, password } = req.body;
   
     try {
-      const user = await User.findOne( email );
+      const user = await User.findOne({
+        where: { email }
+      });
       
       if ( !user ) {
-        return next( new AppError( `User with email ${ email } does not exist.`, 404 ) );
+        return next( new AppError({ message: `User with email ${ email } does not exist.`, statusCode: 404 }));
       }
       
       if ( !user.status ) {
-        return next( new AppError( 'User is not active.', 400 ) );
+        return next( new AppError({ message: 'User is not active.', statusCode: 400 }));
       }
       
       const auth = bcrypt.compareSync( password, user.password );
       
       if (!auth) {
-        return next( new AppError( 'Incorrect password.', 400 ) );
+        return next( new AppError({ message: 'Incorrect password.', statusCode: 400 }));
       }
       
       const token = await JWTProvider( user.uid );
       
-      res.status( 200 ).json({
-        user,
-        token,
+      return sendResponse( res, 200, { 
+        success: true,
+        message: 'Loged in.',
+        token 
       });
   
     } catch ( error ) {
-      next( new AppError( 'Internal server error', 500, false, error ) );
+      next( new AppError({ message: 'Internal server error', statusCode: 500, isOperational: false, data: error }));
     }
 };
 
@@ -43,15 +47,14 @@ export const registrationController = async ( req: Request, res: Response, next:
       const salt = await bcrypt.genSalt( 10 );
       const passwordHash = await bcrypt.hash( password, salt );
       
-      const user = await User.create({ first_name, last_name, email, password: passwordHash });
-  
-      return res.status( 201 ).json({
+      let user = await User.create({ first_name, last_name, email, password: passwordHash });
+      
+      return sendResponse(res, 201, {
         success: true,
         message: 'User registered successfully',
-        user,
-      });
-
+        user
+      })
     } catch ( error ) {
-      next( new AppError( 'Error creating user.', 500, false, error ) );
+      next( new AppError({ message: 'Error creating user.', statusCode: 500, isOperational: false, data: error }));
     }
 };

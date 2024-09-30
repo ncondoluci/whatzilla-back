@@ -6,8 +6,8 @@ import List from './List';
 class Campaign extends Model {
     public id!: number;
     public uid!: string; // UUID
-    public user_id!: number;
-    public list_id!: number;
+    public user_id!: string;
+    public list_id!: string;
     public name!: string;
     public status!: 'active' | 'disable';
     public sent_at?: Date;    
@@ -30,21 +30,21 @@ Campaign.init({
         unique: true,
     },
     user_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: User,
-            key: 'id',
+            key: 'uid',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',
     },
     list_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: true,
         references: {
             model: List,
-            key: 'id',
+            key: 'uid',
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL',
