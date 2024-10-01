@@ -1,79 +1,84 @@
 import fs from 'fs';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { UploadedFile } from 'express-fileupload';
+import { AppError } from '@/providers/ErrorProvider';
+import Campaign from '@/models/Campaign';
 
-// Ruta al archivo JSON que simulará la base de datos
-const campaignsFilePath = path.join(__dirname, '..', 'data', 'campaigns.json');
+class CampaignProvider {
+    private user_id: string;
 
-// Función para leer el archivo JSON
-const readCampaignsFromFile = (): any[] => {
-    try {
-        const data = fs.readFileSync(campaignsFilePath, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error leyendo el archivo JSON:', error);
-        return [];
-    }
-};
-
-// Función para escribir en el archivo JSON
-const writeCampaignsToFile = (campaigns: any[]): void => {
-    try {
-        fs.writeFileSync(campaignsFilePath, JSON.stringify(campaigns, null, 2), 'utf-8');
-        console.log('Datos guardados exitosamente.');
-    } catch (error) {
-        console.error('Error guardando en el archivo JSON:', error);
-    }
-};
-
-// Función para agregar una nueva campaña al archivo JSON
-export const addNewCampaign = (newCampaign: { id: string; user_id: string; nombre: string; created_at: string }) => {
-    const campaigns = readCampaignsFromFile();
-    campaigns.push(newCampaign);
-    writeCampaignsToFile(campaigns);
-};
-
-// Función para obtener la campaña por ID y luego buscar el archivo de campaña correspondiente en la estructura de directorios
-export const getCampaignById = (campaignId: string): string | null => {
-    // Leer todas las campañas del archivo JSON
-    const campaigns = readCampaignsFromFile();
-
-    // Buscar la campaña por ID
-    const campaign = campaigns.find(c => c.id === campaignId);
-
-    if (!campaign) {
-        console.error(`No se encontró la campaña con ID: ${campaignId}`);
-        return null;
+    constructor(user_id: string) {
+        this.user_id = user_id;
     }
 
-    const { user_id, created_at, nombre } = campaign;
+    public async uploadCampaignFile(file: UploadedFile): Promise<void> {
+        console.log(this.user_id)
+        try {
+            // Obtiene la fecha actual
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
 
-    // Extraer año, mes y día del campo created_at
-    const date = new Date(created_at);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0'); // Mes en formato 2 dígitos
-    const day = String(date.getDate()).padStart(2, '0'); // Día en formato 2 dígitos
+            // Genera un ID único para el archivo (este será el id de la campaña también)
+            const uniqueFileId = uuidv4();
+            
+            // Obtén la extensión del archivo para mantener su tipo
+            const fileExtension = path.extname(file.name);
+            
+            // Construye la ruta dinámica desde la raíz del proyecto usando process.cwd()
+            const userDir = path.resolve(process.cwd(), 'src', 'uploads', `${year}`, `${month}`, `${day}`, this.user_id);
+            
+            // Verifica si la carpeta existe, si no, la crea
+            if (!fs.existsSync(userDir)) {
+                fs.mkdirSync(userDir, { recursive: true });
+            }
 
-    // Construir la ruta hacia el archivo de la campaña en el directorio de uploads
-    const campaignFilePath = path.resolve(
-        process.cwd(),
-        'src',
-        'uploads',
-        `${year}`,
-        `${month}`,
-        `${day}`,
-        user_id,
-        nombre // Nombre original del archivo de campaña
-    );
+            // Crea el nombre único del archivo
+            const fileName = `${uniqueFileId}${fileExtension}`;
+            const filePath = path.join(userDir, fileName);
 
-    // Verificar si el archivo de la campaña existe
-    if (!fs.existsSync(campaignFilePath)) {
-        console.error(`No se encontró el archivo de la campaña en: ${campaignFilePath}`);
-        return null;
+            // Mueve el archivo a la ruta con el nombre único
+            await this.moveFile(file, filePath);
+
+
+            // Guarda la campaña en la base de datos
+            const newCampaign = await this.saveCampaignToDB({
+                uid: uniqueFileId,
+                user_id: this.user_id,
+                name: file.name,
+                created_at: now.toISOString(),
+            });
+
+            if (!newCampaign) {
+                throw new AppError({ message: 'Failed to save campaign to the database', statusCode: 500 });
+            }
+        } catch (err) {
+            throw new AppError({ message: 'Error uploading campaign file', statusCode: 500 });
+        }
     }
 
-    // Leer el contenido de la campaña (o simplemente devolver la ruta si quieres procesarlo después)
-    const campaignContent = fs.readFileSync(campaignFilePath, 'utf-8');
-    
-    console.log(`Campaña encontrada: ${campaignFilePath}`);
-    return campaignContent; // O devolver campaignFilePath si solo necesitas la ruta
-};
+    private async moveFile(file: UploadedFile, filePath: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            file.mv(filePath, (err: any) => {
+                if (err) {
+                    reject(new AppError({ message: 'Error moving file', statusCode: 500 }));
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    private async saveCampaignToDB(campaignData: any): Promise<any> {
+        try {
+            const newCampaign = await Campaign.create(campaignData);
+            return newCampaign;
+        } catch (error) {
+            throw new AppError({ message: 'Database error while saving campaign', statusCode: 500 });
+        }
+    }
+}
+
+export default CampaignProvider;

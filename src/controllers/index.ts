@@ -6,7 +6,9 @@ import {
     postCampaign,
     getCampaign,
     patchCampaign,
-    deleteCampaign
+    getCampaignsList,
+    deleteCampaign,
+    uploadCampaign
 } from '@/controllers/campaignController';
 
 // Lists
@@ -16,9 +18,6 @@ import {
     patchList,
     deleteList
 } from '@/controllers/listController';
-
-// Files
-import { uploadCampaignFile } from '@/controllers/fileUploadController';
 
 // Subscribers
 import { 
@@ -41,8 +40,10 @@ export {
     // Campaigns
     postCampaign,
     getCampaign,
+    getCampaignsList,
     patchCampaign,
     deleteCampaign,
+    uploadCampaign,
 
     // Lists
     postList,
@@ -50,10 +51,7 @@ export {
     patchList,
     deleteList,
 
-    // Files
-    uploadCampaignFile,
-
-    // Subscriber
+    // Subscribers
     postSubscriber,
     getSubscriber,
     patchSubscriber,

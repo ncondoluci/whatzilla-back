@@ -27,7 +27,6 @@ export const postSubscriber = async ( req: Request, res: Response, next: NextFun
     }
 };
 
-
 export const getSubscriber = async ( req: Request, res: Response, next: NextFunction ) => {
     const { uid } = req.params;
 

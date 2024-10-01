@@ -5,39 +5,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppError } from "@/providers/ErrorProvider";
 import Campaign from '@/models/Campaign';
 import { sendResponse } from '@/utils/customResponse';
-
-export const getCampaignList = ( req: Request, res: Response, next: NextFunction ): Promise<void> => {
-    // const { userId } = req.params; // Obtiene el userId de los parámetros de la ruta
-    const userId = 'user_1234';
-    // Ruta base donde se almacenan los archivos de los usuarios
-    const baseDir = path.resolve('src', 'uploads');
-  
-    // Se define la ruta del directorio del usuario
-    const userDir = path.join(baseDir, '**', '**', '**', userId); // Puedes ajustar los niveles si la estructura es más compleja
-  
-    try {
-      // Verifica si el directorio existe
-      if (!fs.existsSync(baseDir)) {
-        return res.status(404).json({ message: 'No se encontró la carpeta base' });
-      }
-  
-      // Encuentra todos los archivos en las carpetas del usuario
-      const files = findFilesForUser(userId, baseDir);
-      
-      if (files.length === 0) {
-        return res.status(404).json({ message: 'No se encontraron archivos para este usuario' });
-      }
-  
-      // Devuelve la lista de archivos
-      return res.status(200).json({
-        message: 'Archivos encontrados',
-        files: files
-      });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Error al obtener los archivos' });
-    }
-};
+import CampaignProvider from '@/providers/CampaignProvider';
 
 export const sendCampaign = ( req: Request, res: Response ) => {
   const campaignId = req.params.id;
@@ -76,7 +44,7 @@ export const getCampaign = async ( req: Request, res: Response, next: NextFuncti
   const { uid } = req.params;
 
   try {
-    const campaign = Campaign.findOne({
+    const campaign = await Campaign.findOne({
       where: {
         uid
     }});
@@ -89,6 +57,32 @@ export const getCampaign = async ( req: Request, res: Response, next: NextFuncti
       success: true,
       message: 'Campaign found.',
       campaign
+    });
+
+  } catch (error) {
+    next(new AppError({ message: "Internal server error", statusCode: 500, isOperational: false }));
+  }
+}
+
+export const getCampaignsList = async ( req: Request, res: Response, next: NextFunction ) => {
+  const { uid: user_id } = req.user;
+
+  try {
+    const campaigns = await Campaign.findAll({
+      where: {
+        user_id
+    }});
+
+    console.log(campaigns)
+
+    if ( !campaigns ) {
+      return next(new AppError({ message: `Campaigns not found for this user`, statusCode: 404 }));
+    }
+
+    return sendResponse(res, 200, {
+      success: true,
+      message: 'Campaigns found.',
+      campaigns
     });
 
   } catch (error) {
@@ -157,31 +151,21 @@ export const deleteCampaign = async ( req: Request, res: Response, next: NextFun
   }
 }
 
-// Función para buscar archivos dentro de las carpetas de usuario
-const findFilesForUser = (userId: string, baseDir: string): string[] => {
-    let filesList: string[] = [];
+export const uploadCampaign = async ( req: Request, res: Response, next: NextFunction ) => {
+  const { file } = req.files; 
+  const user_id = req.user.uid;
   
-    // Recursivamente buscar archivos dentro de las carpetas del usuario
-    const readDirRecursively = (dir: string) => {
-      const files = fs.readdirSync(dir);
-  
-      files.forEach((file) => {
-        const filePath = path.join(dir, file);
-  
-        if (fs.lstatSync(filePath).isDirectory()) {
-          // Si es una carpeta, llama recursivamente
-          readDirRecursively(filePath);
-        } else {
-          // Si es un archivo, agrega a la lista
-          if (filePath.includes(userId)) {
-            filesList.push(filePath);
-          }
-        }
+  try {
+      const campaignProvider = new CampaignProvider(user_id);
+      await campaignProvider.uploadCampaignFile(file);
+
+      return sendResponse(res, 200, {
+        success: true,
+        message: 'Campaign file uploaded and saved successfully.' 
       });
-    };
-  
-    // Inicia la búsqueda en la base del directorio
-    readDirRecursively(baseDir);
-  
-    return filesList;
-}
+
+  } catch (error) {
+      console.error('Error details:', error);
+      next(new AppError({ message: 'Failed to upload campaign', statusCode: 500 }));
+  }
+};

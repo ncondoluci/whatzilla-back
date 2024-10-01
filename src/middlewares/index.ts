@@ -1,11 +1,6 @@
-
 import {
-    authMiddleware
-} from '@/middlewares/authMiddleware';
-
-// import {
-
-// } from '@/middlewares/campaignsMiddleware';
+    fileValidator
+} from '@/middlewares/uploadFileMiddleware';
 
 import {
     globalErrorHandler
@@ -15,20 +10,13 @@ import {
     JWTValidator
 } from '@/middlewares/JWTValidator';
 
-// import {    
-
-// } from '@/middlewares/listsMiddleware';
-
 import {
     validationMiddleware
 } from '@/middlewares/resultsValidatorMiddleware';
 
-// import {
-
-// } from '@/middlewares/usersMiddleware';
 
 export {
-    authMiddleware,
+    fileValidator,
     globalErrorHandler,
     JWTValidator,
     validationMiddleware

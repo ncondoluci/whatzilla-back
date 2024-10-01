@@ -9,7 +9,6 @@ import {
     authRoutes,
     usersRoutes, 
     campaignsRoutes, 
-    filesRoutes, 
     listsRoutes,
     subscribersRoutes    
 } from '../routes';
@@ -63,7 +62,7 @@ class Server {
             console.error('Forced shutdown due to timeout.');
             process.exit(1);  // Force shutdown after 10 seconds if not done
         }, 10000);
-    }
+    };
     
     constructor() {
         this.app = express();
@@ -71,7 +70,6 @@ class Server {
 
         this.paths = {
             auth: '/api/auth',
-            files: '/api/files',
             users: '/api/users',
             campaigns: '/api/campaigns',
             lists: '/api/lists',
@@ -146,7 +144,6 @@ class Server {
     private routes() {
         // Register routes
         this.app.use(this.paths.auth, authRoutes);
-        this.app.use(this.paths.files, filesRoutes);
         this.app.use(this.paths.campaigns, campaignsRoutes);
         this.app.use(this.paths.lists, listsRoutes);
         this.app.use(this.paths.users, usersRoutes);

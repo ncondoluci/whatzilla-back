@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { body, param } from "express-validator";
-import { JWTValidator, validationMiddleware } from "@/middlewares";
-import { postCampaign, getCampaign, patchCampaign, deleteCampaign } from "@/controllers";
+import { fileValidator, JWTValidator, validationMiddleware } from "@/middlewares";
+import { postCampaign, getCampaign, getCampaignsList, patchCampaign, deleteCampaign, uploadCampaign } from "@/controllers";
 
 const router = Router();
 
@@ -15,6 +15,17 @@ router.post('/', [
         .isString().withMessage('Invalid formar for user_id'),
     validationMiddleware
 ], postCampaign);
+
+router.post('/upload', [
+    JWTValidator,
+    fileValidator,
+    validationMiddleware
+], uploadCampaign);
+
+router.get('/', [
+    JWTValidator,
+    validationMiddleware
+], getCampaignsList);
 
 router.get('/:uid', [
     JWTValidator,

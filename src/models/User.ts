@@ -16,7 +16,7 @@ class User extends Model {
 
   public JWTuser() {
     return {
-      uid: this.id,
+      uid: this.uid,
     };
   }
 }
