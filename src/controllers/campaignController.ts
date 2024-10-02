@@ -1,6 +1,3 @@
-// Sys libs
-import fs from 'fs';
-import path from "path";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "@/providers/ErrorProvider";
 import Campaign from '@/models/Campaign';
@@ -72,8 +69,6 @@ export const getCampaignsList = async ( req: Request, res: Response, next: NextF
       where: {
         user_id
     }});
-
-    console.log(campaigns)
 
     if ( !campaigns ) {
       return next(new AppError({ message: `Campaigns not found for this user`, statusCode: 404 }));

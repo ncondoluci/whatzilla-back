@@ -13,37 +13,27 @@ class CampaignProvider {
     }
 
     public async uploadCampaignFile(file: UploadedFile): Promise<void> {
-        console.log(this.user_id)
         try {
-            // Obtiene la fecha actual
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
 
-            // Genera un ID único para el archivo (este será el id de la campaña también)
             const uniqueFileId = uuidv4();
             
-            // Obtén la extensión del archivo para mantener su tipo
             const fileExtension = path.extname(file.name);
             
-            // Construye la ruta dinámica desde la raíz del proyecto usando process.cwd()
             const userDir = path.resolve(process.cwd(), 'src', 'uploads', `${year}`, `${month}`, `${day}`, this.user_id);
             
-            // Verifica si la carpeta existe, si no, la crea
             if (!fs.existsSync(userDir)) {
                 fs.mkdirSync(userDir, { recursive: true });
             }
 
-            // Crea el nombre único del archivo
             const fileName = `${uniqueFileId}${fileExtension}`;
             const filePath = path.join(userDir, fileName);
 
-            // Mueve el archivo a la ruta con el nombre único
             await this.moveFile(file, filePath);
 
-
-            // Guarda la campaña en la base de datos
             const newCampaign = await this.saveCampaignToDB({
                 uid: uniqueFileId,
                 user_id: this.user_id,

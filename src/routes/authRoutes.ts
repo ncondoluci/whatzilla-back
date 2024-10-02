@@ -6,11 +6,7 @@ import { authController, registrationController } from "@/controllers";
 
 const router = Router();
 
-router.get( '/', ( req: Request, res: Response) => {
-    res.send('Auth system.')
-});
-
-router.post( '/sign-in', registrationController );
-router.post( '/log-in', authController );
+router.post( '/signin', registrationController );
+router.post( '/login', authController );
 
 export default router;
