@@ -8,7 +8,10 @@ import {
     patchCampaign,
     getCampaignsList,
     deleteCampaign,
-    uploadCampaign
+    uploadCampaign,
+    pauseCampaign,
+    resumeCampaign,
+    cancelCampaign
 } from '@/controllers/campaignController';
 
 // Lists
@@ -32,6 +35,12 @@ import {
     getUser
 } from '@/controllers/userController';
 
+import {
+    startMockCampaignFromFile
+} from '@/controllers/mockController';
+
+import { readCampaignFile } from './testsController';
+
 export {
     // Authentication
     authController,
@@ -44,6 +53,9 @@ export {
     patchCampaign,
     deleteCampaign,
     uploadCampaign,
+    pauseCampaign,
+    resumeCampaign,
+    cancelCampaign,
 
     // Lists
     postList,
@@ -58,5 +70,11 @@ export {
     deleteSubscriber,
 
     // User
-    getUser
+    getUser,
+
+    // Mock
+    startMockCampaignFromFile,
+
+    // Test Controllers
+    readCampaignFile
 };

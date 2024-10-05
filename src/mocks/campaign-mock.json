@@ -1,0 +1,8 @@
+{
+    "campaignUid": "mock-campaign-123",
+    "userUid": "user-mock-456",
+    "message": "Hola, desde Whatzilla",
+    "recipients": [
+      "+5491136986396"
+    ]
+} 

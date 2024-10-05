@@ -1,12 +1,34 @@
-import fs from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { UploadedFile } from 'express-fileupload';
+import * as XLSX        from 'xlsx';
 import { AppError } from '@/providers/ErrorProvider';
-import Campaign from '@/models/Campaign';
+import Campaign     from '@/models/Campaign';
 
 class CampaignProvider {
     private user_id: string;
+    
+    private async moveFile(file: UploadedFile, filePath: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            file.mv(filePath, (err: any) => {
+                if (err) {
+                    reject(new AppError({ message: 'Error moving file', statusCode: 500 }));
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+    
+    private async saveCampaignToDB(campaignData: any): Promise<any> {
+        try {
+            const newCampaign = await Campaign.create(campaignData);
+            return newCampaign;
+        } catch (error) {
+            throw new AppError({ message: 'Database error while saving campaign', statusCode: 500 });
+        }
+    }
 
     constructor(user_id: string) {
         this.user_id = user_id;
@@ -49,26 +71,45 @@ class CampaignProvider {
         }
     }
 
-    private async moveFile(file: UploadedFile, filePath: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            file.mv(filePath, (err: any) => {
-                if (err) {
-                    reject(new AppError({ message: 'Error moving file', statusCode: 500 }));
-                } else {
-                    resolve();
-                }
-            });
-        });
-    }
-
-    private async saveCampaignToDB(campaignData: any): Promise<any> {
+    public async getCampaignData(campaignId: string): Promise<CampaignData[]> {
         try {
-            const newCampaign = await Campaign.create(campaignData);
-            return newCampaign;
+            const campaign = await Campaign.findOne({
+            where: { uid: campaignId },
+            attributes: ['createdAt', 'user_id'],
+            });
+      
+            if (!campaign) {
+                throw new Error(`Campaign with ID ${campaignId} not found`);
+            }
+      
+            const createdAt = new Date(campaign.createdAt);
+            const year = createdAt.getFullYear();
+            const month = (`0${createdAt.getMonth() + 1}`).slice(-2);
+            const day = (`0${createdAt.getDate()}`).slice(-2);
+        
+            const userId = campaign.user_id;
+      
+            const filePath = path.join(
+            process.cwd(),
+            `/src/uploads/${year}/${month}/${day}/${userId}/${campaignId}.xlsx`
+            );
+      
+            const fileBuffer = await fs.readFile(filePath);
+      
+            const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+            
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+      
+            const campaignData = XLSX.utils.sheet_to_json(worksheet);
+      
+            return campaignData;
         } catch (error) {
-            throw new AppError({ message: 'Database error while saving campaign', statusCode: 500 });
+            console.error(`Error reading campaign data: ${error.message}`);
+            throw new Error('Failed to read campaign file');
         }
     }
+
 }
 
 export default CampaignProvider;

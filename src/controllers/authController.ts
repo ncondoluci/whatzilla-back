@@ -7,7 +7,6 @@ import { sendResponse } from "@/utils/customResponse";
 
 export const authController = async ( req: Request, res: Response, next: NextFunction ) => {
     const { email, password } = req.body;
-    console.log("email:", email)
   
     try {
       const user = await User.findOne({

@@ -1,24 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { AppError } from "@/providers/ErrorProvider";
-import Campaign from '@/models/Campaign';
+import { AppError }     from "@/providers/ErrorProvider";
+import Campaign         from '@/models/Campaign';
 import { sendResponse } from '@/utils/customResponse';
-import CampaignProvider from '@/providers/CampaignProvider';
-
-export const sendCampaign = ( req: Request, res: Response ) => {
-  const campaignId = req.params.id;
-
-  // Buscar la campaña por ID
-  const campaign = getCampaignById(campaignId);
-
-  if (!campaign) {
-    return res.status(404).send({ message: 'Campaña no encontrada' });
-  }
-
-  // Iniciar el envío de la campaña
-  startCampaign(io, campaign);
-
-  res.send({ message: 'Campaña iniciada', campaignId: campaignId });
-}
+import CampaignProvider from '@/providers/campaignProvider';
+import redisClient      from '@/config/redis';
 
 export const postCampaign = async ( req: Request, res: Response, next: NextFunction ) => {
   const { name, user_id  } = req.body;
@@ -163,4 +148,34 @@ export const uploadCampaign = async ( req: Request, res: Response, next: NextFun
       console.error('Error details:', error);
       next(new AppError({ message: 'Failed to upload campaign', statusCode: 500 }));
   }
+};
+
+export const pauseCampaign = async (req: Request, res: Response): Promise<void> => {
+  const { uid } = req.params;
+
+  await Campaign.update({ status: 'paused' }, { where: { uid } });
+
+  redisClient.hset(`campaign:${uid}`, 'status', 'paused');
+
+  res.status(200).send('Campaign paused');
+};
+
+export const resumeCampaign = async (req: Request, res: Response): Promise<void> => {
+  const { uid } = req.params;
+
+  await Campaign.update({ status: 'active' }, { where: { uid } });
+
+  redisClient.hset(`campaign:${uid}`, 'status', 'active');
+
+  res.status(200).send('Campaign resumed');
+};
+
+export const cancelCampaign = async (req: Request, res: Response): Promise<void> => {
+  const { uid } = req.params;
+
+  await Campaign.update({ status: 'cancelled' }, { where: { uid } });
+
+  redisClient.hset(`campaign:${uid}`, 'status', 'cancelled');
+
+  res.status(200).send('Campaign cancelled');
 };

@@ -1,7 +1,10 @@
 .env
+.wwebjs_auth
+.wwebjs_cache
+dist
 
 node_modules
-uploads/*
+src/uploads/*
 data
 
 package-lock.json

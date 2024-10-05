@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { body, param } from "express-validator";
 import { fileValidator, JWTValidator, validationMiddleware } from "@/middlewares";
-import { postCampaign, getCampaign, getCampaignsList, patchCampaign, deleteCampaign, uploadCampaign } from "@/controllers";
+import { postCampaign, getCampaign, getCampaignsList, patchCampaign, deleteCampaign, uploadCampaign, pauseCampaign, resumeCampaign, cancelCampaign, startMockCampaignFromFile } from "@/controllers";
 
 const router = Router();
 
@@ -53,5 +53,11 @@ router.delete('/:uid', [
         .isString().withMessage('Invalid format for campaign UID'),
     validationMiddleware
 ], deleteCampaign);
+
+router.post('/pause/:uid', pauseCampaign);
+router.post('/resume/:uid', resumeCampaign);
+router.post('/cancel/:uid', cancelCampaign);
+
+router.post('/start-mock-file', startMockCampaignFromFile);
 
 export default router;

@@ -4,13 +4,17 @@ import cors from 'cors';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 
+// Sockets
+import { initializeCampaignSockets } from '@/sockets/campaignSockets';
+
 // Routes
 import { 
     authRoutes,
     usersRoutes, 
     campaignsRoutes, 
     listsRoutes,
-    subscribersRoutes    
+    subscribersRoutes,
+    testsRoutes 
 } from '../routes';
 
 // Middlewares
@@ -26,6 +30,7 @@ import { AppError } from '../providers/ErrorProvider';
 
 // Utils
 import { logger } from '../utils/logger';
+import { initializeJobQueue } from '@/queues/campaignQueues';
 
 class Server {
     public app: express.Application;
@@ -39,6 +44,7 @@ class Server {
         lists: string;
         users: string;
         subscribers: string;
+        tests: string;
     };
 
     private async shutdown(reason: string) {
@@ -74,6 +80,7 @@ class Server {
             campaigns: '/api/campaigns',
             lists: '/api/lists',
             subscribers: '/api/subscribers',
+            tests: '/api/tests',
         };
 
         this.server = http.createServer(this.app);
@@ -85,11 +92,12 @@ class Server {
             }
         });
 
+        this.systemListeners();
         this.connectDB();
         this.middlewares();
         this.routes();
         this.sockets();
-        this.systemListeners();
+        this.initializeQueues();
     }
 
     async systemListeners() {
@@ -119,26 +127,11 @@ class Server {
     }
 
     private sockets() {
-        // Socket.IO listeners
-        this.io.on('connection', (socket) => {
-            console.log('Client connected:', socket.id);
+        initializeCampaignSockets(this.io);
+    }
 
-            socket.on('start-campaign', (campaignId: string) => {
-                console.log(`Starting send campaign ID: ${campaignId}`);
-            });
-
-            socket.on('pause-campaign', () => {
-                console.log('Campaign stopped');
-            });
-
-            socket.on('resume-campaign', () => {
-                console.log('Campaign resumed');
-            });
-
-            socket.on('disconnect', () => {
-                console.log('Client disconnected:', socket.id);
-            });
-        });
+    private initializeQueues() {
+        initializeJobQueue(this.io);
     }
 
     private routes() {
@@ -148,6 +141,7 @@ class Server {
         this.app.use(this.paths.lists, listsRoutes);
         this.app.use(this.paths.users, usersRoutes);
         this.app.use(this.paths.subscribers, subscribersRoutes);
+        this.app.use(this.paths.tests, testsRoutes);
 
         // Catch undefined routes
         this.app.use('*', (req: Request, res: Response, next: NextFunction) => {
@@ -179,7 +173,6 @@ class Server {
     }
 
     public listen() {
-        // Use this.server.listen instead of this.app.listen
         this.server.listen(this.port, () => {
             console.log('Server running on port:', this.port);
         });
