@@ -91,7 +91,8 @@ class Server {
                 allowedHeaders: ['Content-Type'],
             }
         });
-
+        this.app.set('io', this.io);
+        
         this.systemListeners();
         this.connectDB();
         this.middlewares();

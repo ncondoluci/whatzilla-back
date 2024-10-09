@@ -1,9 +1,12 @@
 import { Request, Response, NextFunction } from "express";
+import qrcode from 'qrcode-terminal';
 import { AppError }     from "@/providers/ErrorProvider";
 import Campaign         from '@/models/Campaign';
 import { sendResponse } from '@/utils/customResponse';
 import CampaignProvider from '@/providers/campaignProvider';
 import redisClient      from '@/config/redis';
+import { whatsappSessionManager } from '@/services/whatsappSessionManager';
+import { Server } from "socket.io";
 
 export const postCampaign = async ( req: Request, res: Response, next: NextFunction ) => {
   const { name, user_id  } = req.body;
@@ -134,7 +137,7 @@ export const deleteCampaign = async ( req: Request, res: Response, next: NextFun
 export const uploadCampaign = async ( req: Request, res: Response, next: NextFunction ) => {
   const { file } = req.files; 
   const user_id = req.user.uid;
-  
+
   try {
       const campaignProvider = new CampaignProvider(user_id);
       await campaignProvider.uploadCampaignFile(file);
@@ -144,9 +147,51 @@ export const uploadCampaign = async ( req: Request, res: Response, next: NextFun
         message: 'Campaign file uploaded and saved successfully.' 
       });
 
-  } catch (error) {
-      console.error('Error details:', error);
+  } catch (error){
+      console.log(error);
       next(new AppError({ message: 'Failed to upload campaign', statusCode: 500 }));
+  }
+};
+
+export const startCampaign = async (req: Request, res: Response) => {
+  const io = req.app.get("io") as Server; 
+
+  const user_id = req.user.uid;
+  const { uid: campaign_id } = req.params;
+
+  try {
+    // Intenta restaurar la sesión si ya está activa
+    const session = await whatsappSessionManager.restoreSession(user_id, io);
+
+    if (session) {
+      return res.status(200).json({
+        success: true,
+        message: "WhatsApp session already active. Campaign can be started."
+      });
+    }
+
+    // Si no hay sesión activa, genera el QR
+    const qrCode = await whatsappSessionManager.startSession(user_id, io);
+
+    if (qrCode) {
+      return res.status(200).json({
+        success: false,
+        message: "QR code generated. Please scan to authenticate.",
+        qr: qrCode // Devuelve el QR en la respuesta HTTP
+      });
+    } else {
+      return res.status(200).json({
+        success: true,
+        message: "WhatsApp session ready. You can start sending messages."
+      });
+    }
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error starting WhatsApp session.",
+      error: error.message || "Unknown error"
+    });
   }
 };
 

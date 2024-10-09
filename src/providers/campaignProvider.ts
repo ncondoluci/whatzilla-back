@@ -2,13 +2,13 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { UploadedFile } from 'express-fileupload';
-import * as XLSX        from 'xlsx';
+import * as XLSX from 'xlsx';
 import { AppError } from '@/providers/ErrorProvider';
-import Campaign     from '@/models/Campaign';
+import Campaign from '@/models/Campaign';
 
 class CampaignProvider {
     private user_id: string;
-    
+
     private async moveFile(file: UploadedFile, filePath: string): Promise<void> {
         return new Promise((resolve, reject) => {
             file.mv(filePath, (err: any) => {
@@ -20,7 +20,7 @@ class CampaignProvider {
             });
         });
     }
-    
+
     private async saveCampaignToDB(campaignData: any): Promise<any> {
         try {
             const newCampaign = await Campaign.create(campaignData);
@@ -42,13 +42,15 @@ class CampaignProvider {
             const day = String(now.getDate()).padStart(2, '0');
 
             const uniqueFileId = uuidv4();
-            
             const fileExtension = path.extname(file.name);
-            
             const userDir = path.resolve(process.cwd(), 'src', 'uploads', `${year}`, `${month}`, `${day}`, this.user_id);
-            
-            if (!fs.existsSync(userDir)) {
-                fs.mkdirSync(userDir, { recursive: true });
+
+            // Usar fs.promises.access para verificar si el directorio existe
+            try {
+                await fs.access(userDir);
+            } catch (error) {
+                // Si no existe el directorio, crearlo
+                await fs.mkdir(userDir, { recursive: true });
             }
 
             const fileName = `${uniqueFileId}${fileExtension}`;
@@ -67,49 +69,46 @@ class CampaignProvider {
                 throw new AppError({ message: 'Failed to save campaign to the database', statusCode: 500 });
             }
         } catch (err) {
-            throw new AppError({ message: 'Error uploading campaign file', statusCode: 500 });
+            throw err;
         }
     }
 
-    public async getCampaignData(campaignId: string): Promise<CampaignData[]> {
+    public async getCampaignData(campaignId: string): Promise<any[]> {
         try {
             const campaign = await Campaign.findOne({
-            where: { uid: campaignId },
-            attributes: ['createdAt', 'user_id'],
+                where: { uid: campaignId },
+                attributes: ['createdAt', 'user_id'],
             });
-      
+
             if (!campaign) {
                 throw new Error(`Campaign with ID ${campaignId} not found`);
             }
-      
+
             const createdAt = new Date(campaign.createdAt);
             const year = createdAt.getFullYear();
             const month = (`0${createdAt.getMonth() + 1}`).slice(-2);
             const day = (`0${createdAt.getDate()}`).slice(-2);
-        
+
             const userId = campaign.user_id;
-      
             const filePath = path.join(
-            process.cwd(),
-            `/src/uploads/${year}/${month}/${day}/${userId}/${campaignId}.xlsx`
+                process.cwd(),
+                `/src/uploads/${year}/${month}/${day}/${userId}/${campaignId}.xlsx`
             );
-      
+
             const fileBuffer = await fs.readFile(filePath);
-      
+
             const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-            
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-      
+
             const campaignData = XLSX.utils.sheet_to_json(worksheet);
-      
+
             return campaignData;
         } catch (error) {
             console.error(`Error reading campaign data: ${error.message}`);
             throw new Error('Failed to read campaign file');
         }
     }
-
 }
 
 export default CampaignProvider;

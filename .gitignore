@@ -5,8 +5,12 @@ dist
 
 node_modules
 src/uploads/*
+src/sessions/*
 data
+migrations/*
+whatsapp-web.js
 
 package-lock.json
 error.log
 exceptions.log
+

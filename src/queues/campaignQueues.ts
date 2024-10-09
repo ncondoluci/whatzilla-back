@@ -17,7 +17,6 @@ const jobQueue = new Queue('jobQueue', {
   }
 });
 
-// Inyectar instancia de Socket.IO
 let io: Server;
 
 export const initializeJobQueue = (ioInstance: Server) => {

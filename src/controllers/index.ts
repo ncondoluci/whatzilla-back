@@ -9,6 +9,7 @@ import {
     getCampaignsList,
     deleteCampaign,
     uploadCampaign,
+    startCampaign,
     pauseCampaign,
     resumeCampaign,
     cancelCampaign
@@ -53,6 +54,8 @@ export {
     patchCampaign,
     deleteCampaign,
     uploadCampaign,
+    startMockCampaignFromFile,
+    startCampaign,
     pauseCampaign,
     resumeCampaign,
     cancelCampaign,
@@ -72,8 +75,7 @@ export {
     // User
     getUser,
 
-    // Mock
-    startMockCampaignFromFile,
+
 
     // Test Controllers
     readCampaignFile
