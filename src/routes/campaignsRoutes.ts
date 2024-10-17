@@ -1,7 +1,18 @@
 import { Router } from "express";
 import { body, param } from "express-validator";
 import { fileValidator, JWTValidator, validationMiddleware } from "@/middlewares";
-import { postCampaign, getCampaign, getCampaignsList, patchCampaign, deleteCampaign, uploadCampaign, pauseCampaign, resumeCampaign, cancelCampaign, startMockCampaignFromFile, startCampaign } from "@/controllers";
+import { 
+    postCampaign, 
+    getCampaign, 
+    getCampaignsList, 
+    patchCampaign, deleteCampaign, 
+    uploadCampaign, 
+    startCampaign,
+    pauseCampaign, 
+    resumeCampaign, 
+    cancelCampaign, 
+    createWhatsAppSession 
+} from "@/controllers";
 
 const router = Router();
 
@@ -54,18 +65,21 @@ router.delete('/:uid', [
     validationMiddleware
 ], deleteCampaign);
 
+router.post('/createWhatsAppSession', [
+    JWTValidator,
+    validationMiddleware
+], createWhatsAppSession)
+
+router.post('/startCampaign/:uid', [
+    JWTValidator,
+    param('uid')
+    .not().isEmpty().withMessage('Campaign UID must not be empty')
+    .isString().withMessage('Invalid format for campaign UID'),
+    validationMiddleware
+], startCampaign);
+
 router.post('/pause/:uid', pauseCampaign);
 router.post('/resume/:uid', resumeCampaign);
 router.post('/cancel/:uid', cancelCampaign);
-
-router.post('/start-mock-file', startMockCampaignFromFile);
-
-router.post('/start-campaign/:uid', [
-    JWTValidator,
-    param('uid')
-        .not().isEmpty().withMessage('Campaign UID must not be empty')
-        .isString().withMessage('Invalid format for campaign_uid'),
-    validationMiddleware
-], startCampaign)
 
 export default router;

@@ -29,7 +29,7 @@ import './associations';
 import { AppError } from '../providers/ErrorProvider';
 
 // Utils
-import { logger } from '../utils/logger';
+import { logger } from '../config/logger';
 import { initializeJobQueue } from '@/queues/campaignQueues';
 
 class Server {

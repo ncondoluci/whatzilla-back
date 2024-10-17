@@ -1,21 +1,26 @@
 import jwt from 'jsonwebtoken';
+import { AppError } from '@/providers/ErrorProvider';
 
-const JWTProvider = (uid: string ): Promise<string | undefined> => {
+const JWTProvider = (uid: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const payload = { uid };
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET_PRIVATE_KEY!, 
+      process.env.JWT_SECRET_PRIVATE_KEY!,
       {
         expiresIn: '2h',
       },
       (err, token) => {
         if (err) {
-          console.error('An error ocurred while JWT was generated', err);
-          reject(err);
+          reject(new AppError({
+            message: 'Error generating JWT token.',
+            statusCode: 500,
+            isOperational: false,
+            data: err
+          }));
         } else {
-          resolve(token);
+          resolve(token!);
         }
       },
     );

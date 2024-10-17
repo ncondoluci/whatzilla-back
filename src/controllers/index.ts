@@ -10,6 +10,7 @@ import {
     deleteCampaign,
     uploadCampaign,
     startCampaign,
+    createWhatsAppSession,
     pauseCampaign,
     resumeCampaign,
     cancelCampaign
@@ -36,10 +37,6 @@ import {
     getUser
 } from '@/controllers/userController';
 
-import {
-    startMockCampaignFromFile
-} from '@/controllers/mockController';
-
 import { readCampaignFile } from './testsController';
 
 export {
@@ -54,8 +51,8 @@ export {
     patchCampaign,
     deleteCampaign,
     uploadCampaign,
-    startMockCampaignFromFile,
     startCampaign,
+    createWhatsAppSession,
     pauseCampaign,
     resumeCampaign,
     cancelCampaign,
@@ -74,8 +71,6 @@ export {
 
     // User
     getUser,
-
-
 
     // Test Controllers
     readCampaignFile

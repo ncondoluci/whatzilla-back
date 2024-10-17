@@ -6,8 +6,8 @@ import jobQueue from "@/queues/campaignQueues";
 export const readCampaignFile = async (req: Request, res: Response) => {
     const { uid: campaignId } = req.params;
     const { uid: userId } = req.user;
-    console.log(campaignId)
-    console.log(userId)
+
+    
     try {
         const Campaign = new CampaignProvider(userId);
         const campaignData = await Campaign.getCampaignData(campaignId);

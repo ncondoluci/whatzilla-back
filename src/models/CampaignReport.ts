@@ -5,7 +5,7 @@ class CampaignReport extends Model {
     public id!: number;
     public uid!: string; // UUID
     public campaign_id!: string;
-    public status!: 'cancelled' | 'stopped' | 'sent' | 'pending';
+    public status!: 'cancelled' | 'stopped' | 'sent' | 'pending' | 'running';
     public sent_porcent!: number;
     public run_at!: Date;
 
@@ -36,7 +36,7 @@ CampaignReport.init({
         onDelete: 'CASCADE',
     },
     status: {
-        type: DataTypes.ENUM('cancelled', 'stopped', 'sent', 'pending'),
+        type: DataTypes.ENUM('cancelled', 'stopped', 'sent', 'pending', 'running'),
         allowNull: false,
     },
     sent_porcent: {

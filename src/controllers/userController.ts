@@ -10,7 +10,10 @@ export const getUser = async (req: Request, res: Response, next: NextFunction) =
         const user = await User.findOne({ where: { uid } });
         
         if (!user) {
-            return next(new AppError({ message: "User not found", statusCode: 404 }));
+            return sendResponse(res, 200, {
+                success: false,
+                message:"User not found."
+            });
         }
 
         const { first_name, last_name, email, status } = user;
@@ -28,6 +31,6 @@ export const getUser = async (req: Request, res: Response, next: NextFunction) =
         });
 
     } catch (error) {
-        next(new AppError({ message: "Internal server error", statusCode: 500, isOperational: false }));
+        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false, data: error }));
     }
 };

@@ -16,7 +16,7 @@ export const postList = async ( req: Request, res: Response, next: NextFunction 
         });
 
     } catch (error) {
-        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false }));
+        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false, data: error }));
     }
 }
 
@@ -27,10 +27,11 @@ export const getList = async (req: Request, res: Response, next: NextFunction) =
         const list = await List.findOne({ where: { uid } });
 
         if (!list) {
-            return next(new AppError({
+            return sendResponse(res, 200, {
+                success: false,
                 message: 'List not found.',
-                statusCode: 404,
-            }));
+                list: null
+            });
         }
 
         return sendResponse( res, 200, {
@@ -40,7 +41,7 @@ export const getList = async (req: Request, res: Response, next: NextFunction) =
         });
 
     } catch (error) {
-        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false }));
+        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false, data: error }));
     }
 }
 
@@ -61,7 +62,10 @@ export const patchList = async (req: Request, res: Response, next: NextFunction)
         const [ affectedRows ] = await List.update( data , { where: { uid }} );
 
         if (affectedRows < 1) {
-            return next(new AppError({ message: 'Update failed - list not found.', statusCode: 404 }));
+            return sendResponse(res, 200, {
+                success: false,
+                message: 'Update failed - list not found.',
+            });
         }
 
         return sendResponse( res, 200, {
@@ -70,7 +74,7 @@ export const patchList = async (req: Request, res: Response, next: NextFunction)
         });
 
     } catch (error) {
-        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false }));
+        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false, data: error }));
     }
 }
 
@@ -81,7 +85,10 @@ export const deleteList = async (req: Request, res: Response, next: NextFunction
         const affectedRows = await List.destroy({ where: { uid }});
 
         if (affectedRows === 0) {
-            return next(new AppError({ message: 'Delete failed - list not found.', statusCode:404 }));
+            return sendResponse(res, 200, {
+                success: false,
+                message: 'Delete failed - list not found.'
+            });
         }
 
         return sendResponse(res, 200, {
@@ -90,6 +97,6 @@ export const deleteList = async (req: Request, res: Response, next: NextFunction
         });
 
     } catch (error) {
-        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false }));
+        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false, data: error }));
     }
 }

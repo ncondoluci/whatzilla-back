@@ -13,7 +13,7 @@ class CampaignProvider {
         return new Promise((resolve, reject) => {
             file.mv(filePath, (err: any) => {
                 if (err) {
-                    reject(new AppError({ message: 'Error moving file', statusCode: 500 }));
+                    reject(new AppError({ message: 'Error moving file', statusCode: 500, isOperational: false }));
                 } else {
                     resolve();
                 }
@@ -26,7 +26,7 @@ class CampaignProvider {
             const newCampaign = await Campaign.create(campaignData);
             return newCampaign;
         } catch (error) {
-            throw new AppError({ message: 'Database error while saving campaign', statusCode: 500 });
+            throw new AppError({ message: 'Database error while saving campaign', statusCode: 500, isOperational: false, data: error });
         }
     }
 
@@ -45,11 +45,11 @@ class CampaignProvider {
             const fileExtension = path.extname(file.name);
             const userDir = path.resolve(process.cwd(), 'src', 'uploads', `${year}`, `${month}`, `${day}`, this.user_id);
 
-            // Usar fs.promises.access para verificar si el directorio existe
+            // Verificar si el directorio existe
             try {
                 await fs.access(userDir);
             } catch (error) {
-                // Si no existe el directorio, crearlo
+                // Si no existe el directorio, crear uno
                 await fs.mkdir(userDir, { recursive: true });
             }
 
@@ -66,10 +66,10 @@ class CampaignProvider {
             });
 
             if (!newCampaign) {
-                throw new AppError({ message: 'Failed to save campaign to the database', statusCode: 500 });
+                throw new AppError({ message: 'Failed to save campaign to the database', statusCode: 500, isOperational: true });
             }
-        } catch (err) {
-            throw err;
+        } catch (error) {
+            throw error instanceof AppError ? error : new AppError({ message: 'Error processing campaign file', statusCode: 500, isOperational: false, data: error });
         }
     }
 
@@ -81,7 +81,7 @@ class CampaignProvider {
             });
 
             if (!campaign) {
-                throw new Error(`Campaign with ID ${campaignId} not found`);
+                throw new AppError({ message: `Campaign with ID ${campaignId} not found`, statusCode: 404, isOperational: true });
             }
 
             const createdAt = new Date(campaign.createdAt);
@@ -105,8 +105,7 @@ class CampaignProvider {
 
             return campaignData;
         } catch (error) {
-            console.error(`Error reading campaign data: ${error.message}`);
-            throw new Error('Failed to read campaign file');
+            throw new AppError({ message: 'Failed to read campaign file', statusCode: 500, isOperational: false, data: error });
         }
     }
 }

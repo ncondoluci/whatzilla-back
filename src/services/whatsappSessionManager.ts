@@ -1,127 +1,183 @@
-import { Client, LocalAuth } from 'whatsapp-web.js';
-import { EventEmitter } from 'events';
-import WhatsAppSession from '@/models/WhatsAppSession';
 import path from 'path';
+import { EventEmitter } from 'events';
+import { Client, LocalAuth } from 'whatsapp-web.js';
+import { logger } from '@/config/logger';
+import WhatsAppSession from '@/models/WhatsAppSession';
 
 class WhatsAppSessionManager extends EventEmitter {
   private sessions: Map<string, Client>;
+  
+  private emitWhatsAppSessionEvent(io: any, userId: string, event: string, payload: any) {
+    io.to(`user_${userId}`).emit("whatsAppSession", {
+      event,
+      ...payload
+    });
+  }
 
   constructor() {
     super();
     this.sessions = new Map();
   }
 
-  async startSession(userId: string, io: any): Promise<Client> {
+  public async startSession(userId: string, io: any): Promise<Client> {
     let client = this.sessions.get(userId);
-  
-    if (!client) {
-      client = new Client({
-        authStrategy: new LocalAuth({
-          clientId: userId,
-          dataPath: path.join(process.cwd(), '/src', '/sessions')
-        }),
-        puppeteer: {
-          headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
-          devtools: false
-        }
-      });
 
-      let qrAttempts = 0;
-      const maxAttempts = 3;
-
-      client.on('qr', (qr: string) => {
-        qrAttempts += 1;
-        console.log(`Sending QR for user ${userId} - Attempt ${qrAttempts}`);
-        
-        // Enviar QR solo si no hemos alcanzado el límite
-        if (qrAttempts <= maxAttempts) {
-          io.to(`user_${userId}`).emit("qr", {
-            success: true,
-            message: `QR generated. Please scan to authenticate. Attempt ${qrAttempts} of ${maxAttempts}.`,
-            qr
-          });
-        }
-
-        // Si se alcanzó el límite de intentos, desconectar la sesión
-        if (qrAttempts >= maxAttempts) {
-          console.log(`Max QR attempts reached for user ${userId}. Cancelling session.`);
-          client.destroy();  // Destruir la sesión si se alcanzan los intentos máximos
-          io.to(`user_${userId}`).emit("sessionStatus", {
-            success: false,
-            message: "Max QR attempts reached. Session has been cancelled."
-          });
-        }
-      });
-  
-      client.on('ready', async () => {
-        console.log(`WhatsApp session ready for user ${userId}`);
-        
-        const existingSession = await WhatsAppSession.findOne({ where: { user_id: userId } });
-  
-        if (!existingSession) {
-          await WhatsAppSession.create({
-            user_id: userId,
-            session_data: null,
-            is_active: true
-          });
-        } else {
-          await WhatsAppSession.update({ is_active: true }, { where: { user_id: userId } });
-        }
-  
-        io.to(`user_${userId}`).emit("sessionStatus", {
-          success: true,
-          message: "WhatsApp session ready. You can start sending messages."
+    try {
+      if (!client) {
+        client = new Client({
+          authStrategy: new LocalAuth({
+            clientId: userId,
+            dataPath: path.join(process.cwd(), '/src', '/sessions')
+          }),
+          puppeteer: {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            devtools: false
+          }
         });
-      });
-  
-      client.on('disconnected', async () => {
-        console.log(`WhatsApp session disconnected for user ${userId}`);
-        await WhatsAppSession.update({ is_active: false }, { where: { user_id: userId } });
-        this.sessions.delete(userId);
-  
-        io.to(`user_${userId}`).emit("sessionStatus", {
-          success: true,
-          message: "WhatsApp session disconnected."
-        });
-      });
-  
-      client.initialize();
-      this.sessions.set(userId, client);
-    }
-  
-    return client;
-  }
 
-  async restoreSession(userId: string, io: any): Promise<Client | null> {
-    const existingSession = await WhatsAppSession.findOne({ where: { user_id: userId, is_active: true } });
-  
-    if (existingSession) {
-      console.log(`Restoring session for user ${userId}`);
-      const client = new Client({
-        authStrategy: new LocalAuth({
-          clientId: userId,
-          dataPath: path.join(process.cwd(), '/src', '/sessions')
-        }),
-        puppeteer: {
-          headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
-          devtools: false
-        }
+        let qrAttempts = 0;
+        const maxAttempts = 3;
+
+        client.on('qr', (qr: string) => {
+          try {
+            qrAttempts += 1;
+            logger.info(`Sending QR for user ${userId} - Attempt ${qrAttempts}`);
+
+            if (qrAttempts <= maxAttempts) {
+              this.emitWhatsAppSessionEvent(io, userId, "qr", {
+                message: `QR generated. Please scan to authenticate. Attempt ${qrAttempts} of ${maxAttempts}.`,
+                qr
+              });
+            }
+
+            if (qrAttempts >= maxAttempts) {
+              logger.info(`Max QR attempts reached for user ${userId}. Cancelling session.`);
+              client.destroy();
+
+              this.emitWhatsAppSessionEvent(io, userId, "disconnected", {
+                message: "Max QR attempts reached. Session has been cancelled."
+              });
+            }
+          } catch (error) {
+            logger.error(`Error while generating QR for user ${userId}:`, { error });
+          }
+        });
+
+        client.on('ready', async () => {
+          try {
+            logger.info(`WhatsApp session ready for user ${userId}`);
+            const existingSession = await WhatsAppSession.findOne({ where: { user_id: userId } });
+
+            if (!existingSession) {
+              await WhatsAppSession.create({
+                user_id: userId,
+                session_data: null,
+                is_active: true
+              });
+            } else {
+              await WhatsAppSession.update({ is_active: true }, { where: { user_id: userId } });
+            }
+
+            this.emitWhatsAppSessionEvent(io, userId, "ready", {
+              message: "WhatsApp session ready. You can start sending messages."
+            });
+          } catch (error) {
+            logger.error(`Error initializing session for user ${userId}:`, { error });
+          }
+        });
+
+        client.on('disconnected', async () => {
+          try {
+            logger.log(`WhatsApp session disconnected for user ${userId}`);
+            await WhatsAppSession.update({ is_active: false }, { where: { user_id: userId } });
+            this.sessions.delete(userId);
+
+            this.emitWhatsAppSessionEvent(io, userId, "disconnected", {
+              message: "WhatsApp session disconnected."
+            });
+          } catch (error) {
+            logger.error(`Error during disconnection for user ${userId}:`, { error });
+          }
         });
 
         client.initialize();
-      this.sessions.set(userId, client);
+        this.sessions.set(userId, client);
+      }
+
+      return client;
+    } catch (error) {
+      logger.error(`Error starting session for user ${userId}:`, { error });
+      throw error; // Lanza el error para ser gestionado en el flujo donde se esté llamando.
+    }
+  }
+
+  public async restoreSession(userId: string, io: any): Promise<Client | null> {
+    try {
+      const existingSession = await WhatsAppSession.findOne({ where: { user_id: userId, is_active: true } });
+
+      if (existingSession) {
+        logger.info(`Restoring session for user ${userId}`);
+        const client = new Client({
+          authStrategy: new LocalAuth({
+            clientId: userId,
+            dataPath: path.join(process.cwd(), '/src', '/sessions')
+          }),
+          puppeteer: {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            devtools: false
+          }
+        });
+
+        client.initialize();
+        this.sessions.set(userId, client);
+
+        this.emitWhatsAppSessionEvent(io, userId, "ready", {
+          message: "WhatsApp session restored. You can start sending messages."
+        });
+
+        return client;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error(`Error restoring session for user ${userId}:`, { error });
+      throw error; // Lanza el error para que sea manejado en la capa superior.
+    }
+  }
+
+  public async sendMessage(userId: string, message: string, recipient: string, io: any): Promise<void> {
+    try {
+      const client = this.sessions.get(userId);
+      if (!client) {
+        throw new Error(`No active session found for user ${userId}`);
+      }
   
-      io.to(`user_${userId}`).emit("sessionStatus", {
-        success: true,
-        message: "WhatsApp session restored. You can start sending messages."
+      const recipientNumber = `${recipient}@c.us`; // WhatsApp usa el formato número@c.us para los contactos
+  
+      const messageId = await client.sendMessage(recipientNumber, message);
+  
+      // Emitir el evento de que el mensaje fue enviado correctamente
+      this.emitWhatsAppSessionEvent(io, userId, "messageSent", {
+        message: `Message sent to ${recipient}`,
+        recipient,
+        messageId,
+        messageContent: message
       });
   
-      return client;
-    }
+      logger.info(`Message sent to ${recipient}: ${messageId}`);
+    } catch (error) {
+      logger.error(`Error sending message for user ${userId} to ${recipient}:`, { message: error.message, stack: error.stack });
   
-    return null;
+      this.emitWhatsAppSessionEvent(io, userId, "error", {
+        message: `Error sending message to ${recipient}`,
+        recipient,
+        error: error.message
+      });
+  
+      throw error;
+    }
   }
 }
 
