@@ -7,11 +7,11 @@ import {
     getCampaignsList, 
     patchCampaign, deleteCampaign, 
     uploadCampaign, 
-    startCampaign,
-    pauseCampaign, 
+    startCampaign, 
+    stopCampaign,
     resumeCampaign, 
     cancelCampaign, 
-    createWhatsAppSession 
+    createWhatsAppSession
 } from "@/controllers";
 
 const router = Router();
@@ -70,7 +70,7 @@ router.post('/createWhatsAppSession', [
     validationMiddleware
 ], createWhatsAppSession)
 
-router.post('/startCampaign/:uid', [
+router.post('/start/:uid', [
     JWTValidator,
     param('uid')
     .not().isEmpty().withMessage('Campaign UID must not be empty')
@@ -78,8 +78,28 @@ router.post('/startCampaign/:uid', [
     validationMiddleware
 ], startCampaign);
 
-router.post('/pause/:uid', pauseCampaign);
-router.post('/resume/:uid', resumeCampaign);
-router.post('/cancel/:uid', cancelCampaign);
+router.post('/stop/:uid', [
+    JWTValidator,
+    param('uid')
+    .not().isEmpty().withMessage('Campaign UID must not be empty')
+    .isString().withMessage('Invalid format for campaign UID'),
+    validationMiddleware
+], stopCampaign);
+
+router.post('/resume/:uid', [
+    JWTValidator,
+    param('uid')
+    .not().isEmpty().withMessage('Campaign UID must not be empty')
+    .isString().withMessage('Invalid format for campaign UID'),
+    validationMiddleware
+], resumeCampaign);
+
+router.post('/terminate/:uid', [
+    JWTValidator,
+    param('uid')
+    .not().isEmpty().withMessage('Campaign UID must not be empty')
+    .isString().withMessage('Invalid format for campaign UID'),
+    validationMiddleware
+], cancelCampaign);
 
 export default router;

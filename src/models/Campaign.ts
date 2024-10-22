@@ -9,7 +9,7 @@ class Campaign extends Model {
     public user_id!: string;
     public list_id!: string;
     public name!: string;
-    public status!: 'active' | 'disable';
+    public status!: 'active' | 'disable' | 'running';
     public sent_at?: Date;    
 
     // Timestamps automáticos

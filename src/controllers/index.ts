@@ -11,7 +11,7 @@ import {
     uploadCampaign,
     startCampaign,
     createWhatsAppSession,
-    pauseCampaign,
+    stopCampaign,
     resumeCampaign,
     cancelCampaign
 } from '@/controllers/campaignController';
@@ -37,6 +37,11 @@ import {
     getUser
 } from '@/controllers/userController';
 
+// WhatsAppSessions
+import { 
+    patchSession
+} from '@/controllers/whatsappSessionController';
+
 import { readCampaignFile } from './testsController';
 
 export {
@@ -53,7 +58,7 @@ export {
     uploadCampaign,
     startCampaign,
     createWhatsAppSession,
-    pauseCampaign,
+    stopCampaign,
     resumeCampaign,
     cancelCampaign,
 
@@ -71,6 +76,9 @@ export {
 
     // User
     getUser,
+
+    // WhatsAppSessions
+    patchSession,
 
     // Test Controllers
     readCampaignFile

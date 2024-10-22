@@ -103,7 +103,7 @@ class WhatsAppSessionManager extends EventEmitter {
 
         client.initialize();
         this.sessions.set(userId, client);
-      }
+      } 
 
       return client;
     } catch (error) {
@@ -114,7 +114,8 @@ class WhatsAppSessionManager extends EventEmitter {
 
   public async restoreSession(userId: string, io: any): Promise<Client | null> {
     try {
-      const existingSession = await WhatsAppSession.findOne({ where: { user_id: userId, is_active: true } });
+      logger.info(`Attempting to restore session for user ${userId}`);
+      const existingSession = await WhatsAppSession.findOne({ where: { user_id: userId, is_active: 1 } });
 
       if (existingSession) {
         logger.info(`Restoring session for user ${userId}`);
@@ -149,16 +150,31 @@ class WhatsAppSessionManager extends EventEmitter {
 
   public async sendMessage(userId: string, message: string, recipient: string, io: any): Promise<void> {
     try {
-      const client = this.sessions.get(userId);
+      let client = this.sessions.get(userId);
       if (!client) {
-        throw new Error(`No active session found for user ${userId}`);
+        client = await this.restoreSession(userId, io);
       }
-  
-      const recipientNumber = `${recipient}@c.us`; // WhatsApp usa el formato número@c.us para los contactos
-  
+
+      if (!client.info?.wid) {
+        logger.warn(`Restoring session for user ${userId}...`);
+        await this.restoreSession(userId, io);
+
+        const restoredClient = this.sessions.get(userId);
+        if (!restoredClient?.info?.wid) {
+          logger.warn(`Session restoration not ready for user ${userId}. Retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Esperar 5 segundos antes de reintentar.
+          
+          const retryClient = this.sessions.get(userId);
+          if (!retryClient?.info?.wid) {
+            throw new Error(`Unable to restore session for user ${userId}`);
+          }
+        }
+        
+      }
+      
+      const recipientNumber = `${recipient}@c.us`; 
       const messageId = await client.sendMessage(recipientNumber, message);
   
-      // Emitir el evento de que el mensaje fue enviado correctamente
       this.emitWhatsAppSessionEvent(io, userId, "messageSent", {
         message: `Message sent to ${recipient}`,
         recipient,
@@ -168,7 +184,7 @@ class WhatsAppSessionManager extends EventEmitter {
   
       logger.info(`Message sent to ${recipient}: ${messageId}`);
     } catch (error) {
-      logger.error(`Error sending message for user ${userId} to ${recipient}:`, { message: error.message, stack: error.stack });
+      logger.error(`Error sending message for user ${userId} to ${recipient}:\n`, { message: error.message, stack: error.stack });
   
       this.emitWhatsAppSessionEvent(io, userId, "error", {
         message: `Error sending message to ${recipient}`,

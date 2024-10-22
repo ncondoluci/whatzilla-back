@@ -22,43 +22,65 @@ const jobQueue = new Queue('jobQueue', {
 });
 
 let io: Server;
+let pausedCampaigns = {};
 
 export const initializeJobQueue = (ioInstance: Server) => {
   io = ioInstance;
 };
 
 jobQueue.process(async (job, done) => {
-  const { dataArray, totalMessages, campaignId, userId } = job.data;
-  let messagesSent = 0;
-  let lastEmittedProgress = 0;
+  const { dataArray, totalMessages, startFrom = 0, campaignId, userId } = job.data;
+  let messagesSent = startFrom; 
+  let lastEmittedProgress = (startFrom / totalMessages) * 100;
 
   try {
     await Campaign.update({ sent_at: new Date() }, { where: { uid: campaignId } });
 
     const campaignReport = await CampaignReport.create({
-      uid: campaignId,
       campaign_id: campaignId,
       status: 'running',
-      sent_porcent: 0,
+      sent_porcent: lastEmittedProgress,
       run_at: new Date(),
     });
 
-    const session = whatsappSessionManager.sessions.get(userId);
-    if (!session) {
-      throw new Error(`No active WhatsApp session found for user ${userId}`);
-    }
+    redisClient.hSet(`campaign:${campaignId}`, 'status', 'running');
 
-    for (const item of dataArray) {
+    for (let i = startFrom; i < dataArray.length; i++) {
+      const item = dataArray[i];
+
       try {
-        logger.info(`Nombre: ${item.Nombre}, Mensaje: ${item.Mensaje}`);
+        const campaignStatus = await redisClient.hGet(`campaign:${campaignId}`, 'status');
+        logger.info(`Estado actual de la campaña ${campaignId}: ${campaignStatus}`);
 
-        // await whatsappSessionManager.sendMessage(userId, item.Mensaje, item.Numero, io);
+        if (campaignStatus === 'stopped' || campaignStatus === 'cancelled') {
+          logger.info(`Campaña ${campaignId} ha sido ${campaignStatus}. Terminando el job.`);
+  
+          await campaignReport.update({
+            status: campaignStatus, 
+            sent_porcent: (messagesSent / totalMessages) * 100,
+          });
+
+          if (io) {
+            io.to(`user_${userId}`).emit('campaigns', {
+              event: 'stop',
+              campaignId,
+              progress: `${((messagesSent / totalMessages) * 100).toFixed(2)}%`,
+            });
+          }
+
+          return done(new Error('Paused: The campaign was stopped intentionally.'));
+        }
+
+        logger.info(`Enviando mensaje a: ${item.Nombre}, WhatsApp: ${item.Whatsapp}, Mensaje: ${item.Mensaje}`);
+        await whatsappSessionManager.sendMessage(userId, item.Mensaje, item.Whatsapp, io);
 
         messagesSent += 1;
         const progress = (messagesSent / totalMessages) * 100;
 
+        // Actualizar el progreso en Redis
         await redisClient.hSet(`campaign:${campaignId}`, 'progress', `${progress.toFixed(2)}%`);
 
+        // Emitir el progreso cada 10%
         if (progress - lastEmittedProgress >= 10) {
           lastEmittedProgress = progress;
 
@@ -73,10 +95,11 @@ jobQueue.process(async (job, done) => {
           }
         }
 
+        // Evitar bloquear el proceso
         await new Promise((resolve) => setTimeout(resolve, 5000));
 
       } catch (error) {
-        logger.error(`Error processing item ${messagesSent}: ${error.message}`, {
+        logger.error(`Error procesando el mensaje número ${messagesSent}: ${error.message}`, {
           campaignId,
           jobId: job.id,
           data: error,
@@ -90,7 +113,7 @@ jobQueue.process(async (job, done) => {
         if (io) {
           io.to(`user_${userId}`).emit('campaigns', {
             event: 'failed',
-            error: `Failed at item ${messagesSent}: ${error.message}`,
+            error: `Error al procesar el mensaje número ${messagesSent}: ${error.message}`,
             campaignId,
           });
         }
@@ -99,31 +122,16 @@ jobQueue.process(async (job, done) => {
       }
     }
 
+    // Actualizar la campaña como enviada
     await Campaign.update({ sent_at: new Date() }, { where: { uid: campaignId } });
+    await campaignReport.update({ status: 'sent', sent_porcent: 100 });
 
-    await campaignReport.update({
-      status: 'sent',
-      sent_porcent: 100,
-    });
-
-    done();
+    // Finalizar el trabajo
+    done(null, campaignReport.uid);
 
   } catch (error) {
-    logger.error(`Error processing campaign ${campaignId}: ${error.message}`, {
-      jobId: job.id,
-      campaignId,
-      data: error,
-    });
-
-    if (io) {
-      io.to(`user_${userId}`).emit('campaigns', {
-        event: 'failed',
-        error: `Failed processing campaign: ${error.message}`,
-        campaignId,
-      });
-    }
-
-    done(error);
+    logger.error(`Error al procesar la campaña ${campaignId}: ${error.message}`);
+    done(new Error(`Error al procesar la campaña ${campaignId}`));
   }
 });
 
@@ -132,7 +140,6 @@ jobQueue.on('completed', async (job) => {
 
   try {
     await Campaign.update({ sent_at: new Date() }, { where: { uid: campaignId } });
-    await CampaignReport.update({ status: 'sent', sent_porcent: 100 }, { where: { campaign_id: campaignId } });
 
     if (io) {
       io.to(`user_${userId}`).emit('campaigns', {
