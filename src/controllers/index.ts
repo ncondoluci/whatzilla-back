@@ -3,6 +3,7 @@ import { authController, registrationController } from '@/controllers/authContro
 
 // Campaigns
 import { 
+    initializeCampaign,
     postCampaign,
     getCampaign,
     patchCampaign,
@@ -15,6 +16,11 @@ import {
     resumeCampaign,
     cancelCampaign
 } from '@/controllers/campaignController';
+
+import {
+    getCampaignReport,
+    getCampaignReports
+} from '@/controllers/campaignReportController';
 
 // Lists
 import {
@@ -50,6 +56,7 @@ export {
     registrationController,
 
     // Campaigns
+    initializeCampaign,
     postCampaign,
     getCampaign,
     getCampaignsList,
@@ -61,6 +68,10 @@ export {
     stopCampaign,
     resumeCampaign,
     cancelCampaign,
+
+    // CampaignReports
+    getCampaignReport,
+    getCampaignReports,
 
     // Lists
     postList,

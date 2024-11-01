@@ -4,7 +4,7 @@ import {
 
 import {
     globalErrorHandler
-} from '@/middlewares/GlobalErrorHandler';
+} from '@/middlewares/globalErrorHandler';
 
 import {
     JWTValidator

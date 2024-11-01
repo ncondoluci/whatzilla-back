@@ -5,32 +5,33 @@ import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 
 // Sockets
-import { initializeCampaignSockets } from '@/sockets/campaignSockets';
+import { initializeSockets } from '@/sockets/Sockets';
 
 // Routes
 import { 
     authRoutes,
     usersRoutes, 
     campaignsRoutes, 
+    campaignReportsRoutes,
     listsRoutes,
     subscribersRoutes,
     whatsappSessions,
     testsRoutes 
-} from '../routes';
+} from '@/routes';
 
 // Middlewares
 import fileUpload from 'express-fileupload';
-import { globalErrorHandler } from '../middlewares/globalErrorHandler';
+import { globalErrorHandler } from '@/middlewares/globalErrorHandler';
 
 // Models
-import { dbConnection, closeDBConnection } from './dbConnection';
-import './associations';
+import { dbConnection, closeDBConnection } from '@/models/dbConnection';
+import '@/models/associations';
 
 // Providers
-import { AppError } from '../providers/ErrorProvider';
+import { AppError } from '@/providers/ErrorProvider';
 
 // Utils
-import { logger } from '../config/logger';
+import { logger } from '@/config/logger';
 import { initializeJobQueue } from '@/queues/campaignQueues';
 
 class Server {
@@ -41,10 +42,11 @@ class Server {
     private paths: {
         auth: string;
         campaigns: string;
-        files: string;
         lists: string;
         users: string;
         subscribers: string;
+        whatsappSessions: string;
+        campaignReports: string;
         tests: string;
     };
 
@@ -59,7 +61,11 @@ class Server {
                 console.log('Database connection closed.');
                 process.exit(0);  // Exit the process successfully
             } catch (err) {
-                logger.error('Error during shutdown', { message: err.message });
+                if (err instanceof Error) {
+                    logger.error('Error during shutdown', { message: err.message });
+                } else {
+                    logger.error('Unknown error during shutdown', { message: String(err) });
+                }
                 process.exit(1);  // Exit the process with a failure status
             }
         });
@@ -79,6 +85,7 @@ class Server {
             auth: '/api/auth',
             users: '/api/users',
             campaigns: '/api/campaigns',
+            campaignReports: '/api/campaignReports',
             lists: '/api/lists',
             subscribers: '/api/subscribers',
             whatsappSessions: '/api/whatsappSessions',
@@ -130,7 +137,7 @@ class Server {
     }
 
     private sockets() {
-        initializeCampaignSockets(this.io);
+        initializeSockets(this.io);
     }
 
     private initializeQueues() {
@@ -141,6 +148,7 @@ class Server {
         // Register routes
         this.app.use(this.paths.auth, authRoutes);
         this.app.use(this.paths.campaigns, campaignsRoutes);
+        this.app.use(this.paths.campaignReports, campaignReportsRoutes);
         this.app.use(this.paths.lists, listsRoutes);
         this.app.use(this.paths.users, usersRoutes);
         this.app.use(this.paths.subscribers, subscribersRoutes);

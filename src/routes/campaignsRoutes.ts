@@ -11,7 +11,8 @@ import {
     stopCampaign,
     resumeCampaign, 
     cancelCampaign, 
-    createWhatsAppSession
+    createWhatsAppSession,
+    initializeCampaign
 } from "@/controllers";
 
 const router = Router();
@@ -76,7 +77,8 @@ router.post('/start/:uid', [
     .not().isEmpty().withMessage('Campaign UID must not be empty')
     .isString().withMessage('Invalid format for campaign UID'),
     validationMiddleware
-], startCampaign);
+], initializeCampaign);
+// ], startCampaign);
 
 router.post('/stop/:uid', [
     JWTValidator,

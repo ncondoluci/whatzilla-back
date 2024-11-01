@@ -8,9 +8,15 @@ import { sendResponse } from '@/utils/customResponse';
 import CampaignProvider from '@/providers/campaignProvider';
 import jobQueue         from "@/queues/campaignQueues";
 import redisClient      from '@/config/redis';
+import { UploadedFile } from "express-fileupload";
+import WhatsAppSession from "@/models/WhatsAppSession";
+import { Client, NoAuth } from "whatsapp-web.js";
+import { logger } from "@/config/logger";
+import { userState } from'@/sockets/socketManager';
 
 export const postCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const { name, user_id } = req.body;
+  const { uid: user_id } = req.user as { uid: string };
+  const { name } = req.body;
 
   try {
     const campaign = await Campaign.create({ name, user_id });
@@ -65,7 +71,8 @@ export const getCampaign = async (req: Request, res: Response, next: NextFunctio
 };
 
 export const getCampaignsList = async (req: Request, res: Response, next: NextFunction) => {
-  const { uid: user_id } = req.user;
+  const { uid: user_id } = req.user as { uid: string };
+
 
   try {
     const campaigns = await Campaign.findAll({
@@ -172,8 +179,9 @@ export const deleteCampaign = async (req: Request, res: Response, next: NextFunc
 };
 
 export const uploadCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const { file } = req.files;
-  const user_id = req.user.uid;
+  const { file } = req.files as { file: UploadedFile };
+  const { uid: user_id } = req.user as { uid: string };
+
 
   try {
     const campaignProvider = new CampaignProvider(user_id);
@@ -195,7 +203,7 @@ export const uploadCampaign = async (req: Request, res: Response, next: NextFunc
 };
 
 export const startCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const { uid: userId } = req.user;
+  const { uid: userId } = req.user as { uid: string };
   const { uid: campaignId } = req.params;
 
   try {
@@ -240,13 +248,17 @@ export const stopCampaign = async (req: Request, res: Response, next: NextFuncti
     }
 
     let progress = await redisClient.hGet(`campaign:${campaignId}`, 'progress');
-    progress = parseFloat(progress);
-    if (isNaN(progress) || progress === null) {
-      progress = 0; 
+    if (progress === null || progress === undefined) {
+      progress = '0';
     }
+    let numericProgress = parseFloat(progress); 
+    
+    if (isNaN(numericProgress)) {
+      numericProgress = 0;
+    } 
 
     await CampaignReport.update(
-      { status: 'stopped', sent_porcent: progress }, 
+      { status: 'stopped', sent_porcent: numericProgress }, 
       { where: { campaign_id: campaignId } }
     );
 
@@ -270,13 +282,12 @@ export const stopCampaign = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-export const resumeCampaign = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const resumeCampaign = async (req: Request, res: Response, next: NextFunction) => {
   const io = req.app.get("io") as Server;
+  const { uid: userId } = req.user as { uid: string };
   const { uid: campaignId } = req.params;
-  const { uid: userId } = req.user;
 
   try {
-    // Verificar que la campaña está en estado 'stopped'
     const campaignReport = await CampaignReport.findOne({ where: { campaign_id: campaignId, status: 'stopped' } });
 
     if (!campaignReport) {
@@ -285,12 +296,12 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
         message: `There is no campaign stopped with the uid ${campaignId} to resume.`
       });
     }
+    const {uid: reportId} = campaignReport;
+    console.log('ReportID: ', reportId);
 
-    // Recuperar el progreso y los datos de la campaña
-    const progress = parseFloat(campaignReport.sent_porcent);
+    const progress = campaignReport.sent_porcent;
 
-    // Recuperar los datos originales de la campaña
-    const campaignProvider = new CampaignProvider(userId);  // Asegúrate de tener una instancia válida
+    const campaignProvider = new CampaignProvider(userId); 
     const campaignData = await campaignProvider.getCampaignData(campaignId);
     const totalMessages = campaignData.length;
 
@@ -301,32 +312,28 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       });
     }
 
-    // Cálculo de los mensajes restantes por enviar
     const startFrom = Math.floor((progress / 100) * totalMessages);
     const messagesToSend = campaignData.slice(startFrom); // Obtener los mensajes restantes
 
-    // Crear un nuevo trabajo en Bull con los datos correctos
     await jobQueue.add({
       campaignId,
+      reportId,
       userId,
-      dataArray: messagesToSend, // Solo los mensajes que faltan por enviar
-      totalMessages, // Número total de mensajes
-      startFrom, // Desde dónde comenzar el envío
+      dataArray: messagesToSend,
+      totalMessages,
+      startFrom,
     });
 
-    // Actualizar el estado de la campaña en la base de datos
     await CampaignReport.update(
       { status: 'running' },
       { where: { campaign_id: campaignId } }
     );
 
-    // Actualizar el estado de la campaña en Redis a 'running'
     await redisClient.hSet(`campaign:${campaignId}`, 'status', 'running');
 
-    // Notificar al usuario que la campaña ha sido reanudada
     io.to(`user_${userId}`).emit('campaigns', { event: 'resume', campaignId, userId });
 
-    return sendResponse(200, res, {
+    return sendResponse(res, 200, {
       success: true,
       message: `Campaign ${campaignId} resumed from ${progress}%`,
     });
@@ -366,7 +373,7 @@ export const cancelCampaign = async (req: Request, res: Response, next: NextFunc
     io.to(`user_${userId}`).emit('campaigns', {
       event: 'cancell',
       campaignId,
-      progress: `${progress.toFixed(2)}%`,
+      progress: `${parseFloat(`${progress}`).toFixed(2)}%`,
     });
 
     const job = await jobQueue.getJob(campaignId);
@@ -391,35 +398,26 @@ export const cancelCampaign = async (req: Request, res: Response, next: NextFunc
 
 export const createWhatsAppSession = async (req: Request, res: Response, next: NextFunction) => {
   const io = req.app.get("io") as Server; 
-  const user_id = req.user.uid;
+  const { uid: user_id } = req.user as { uid: string };
 
   try {
-    const session = await whatsappSessionManager.restoreSession(user_id, io);
 
-    if (session) {
-      return res.status(200).json({
+    const existSession = await WhatsAppSession.findOne({ where: { user_id } });
+
+    if (existSession) {
+      return sendResponse(res, 200, {
         success: true,
         message: "WhatsApp session already active. Campaign can be started."
       });
     }
 
-    const qrCode = await whatsappSessionManager.startSession(user_id, io );
-
-    if (qrCode) {
+    await whatsappSessionManager.startSession(user_id, io );
       
-      return sendResponse(res, 200, {
-        success: true,
-        message: "QR code generated. Please scan to authenticate.",
-      });
-
-    } else {
-      
-      return sendResponse(res, 200, {
-        success: true,
-        message: "WhatsApp session ready. You can start sending messages."
-      });
-    
-    }
+    return sendResponse(res, 200, {
+      success: false,
+      message: "QR code generated. Please scan to authenticate.",
+    });
+          
   } catch (error) {
     next(new AppError({
       message: 'Error starting WhatsApp session.',
@@ -429,3 +427,78 @@ export const createWhatsAppSession = async (req: Request, res: Response, next: N
     }));
   }
 };
+
+export const initializeCampaign = async (req: Request, res: Response, next: NextFunction) => {
+  const io = req.app.get("io") as Server;
+  const { uid: user_id } = req.user as { uid: string };
+  const { uid: campaign_id } = req.params;
+
+  const socketId = userState.get(user_id);
+  
+  try {
+    if (!socketId) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Socket ID not found.'
+      });
+    }
+    // Procession the data form a campaign file (xlsx)
+    const campaignProvider = new CampaignProvider(user_id);
+    const campaignData = await campaignProvider.getCampaignData(campaign_id);
+    const totalMessages = campaignData.length;
+
+    if(!campaignData || !totalMessages) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error loading campaign data || Campaign data not found.'
+      });
+    }
+  
+    const client = new Client({
+      authStrategy: new NoAuth(),
+      puppeteer: {
+        headless: false, 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      }
+    });
+    
+    if (!client) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error creating WhatsApp client.'
+      });
+    }
+
+    client.on('ready', async () => {
+      logger.info('Job running.');
+
+      userState.set(user_id, {
+        ...userState.get(user_id),
+        [`client`]: client
+      });
+      
+      await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id });
+    });
+
+    client.on('qr', (qr: string) => {
+      return sendResponse(res, 200, {
+        success: true,
+        message: "QR code generated. Please scan to authenticate.",
+        qr
+      });
+    });
+
+    client.on('auth_failure', (error) => {
+      return sendResponse(res, 200, {
+        success: false,
+        message: "What's App authentication failed.",
+      });
+    });
+
+    await client.initialize();
+
+  } catch (error) {
+    next(new AppError({ message: "An error occurred while initializing campaign.", statusCode: 500, isOperational: false, data: error }));
+  }
+};
+

@@ -54,7 +54,7 @@ Campaign.init({
         allowNull: false,
     },
     status: {
-        type: DataTypes.ENUM('active' , 'disable'),
+        type: DataTypes.ENUM('active' , 'disable', 'running'),
         allowNull: false,
         defaultValue: 'active',
     },

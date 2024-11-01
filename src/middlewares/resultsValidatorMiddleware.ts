@@ -15,11 +15,16 @@ export const validationMiddleware = (req: Request, res: Response, next: NextFunc
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
-        const customErrors: ICustomValidationError[] = errors.array().map((err: ValidationError) => ({
-            location: err.location || 'unknown',
-            field: err.param,
-            message: err.msg
-        }));
+        const customErrors: ICustomValidationError[] = errors.array().map((err: ValidationError) => {
+            const location = 'location' in err ? err.location : 'unknown';
+            const field = 'param' in err ? String(err.param) : 'unknown';
+
+            return {
+                location,
+                field,
+                message: err.msg
+            };
+        });
 
         return next(new AppError({
             message: 'Validation failed',
