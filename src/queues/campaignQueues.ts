@@ -34,7 +34,7 @@ jobQueue.process(async (job, done) => {
   let lastEmittedProgress = (startFrom / totalMessages) * 100;
 
   try {
-    await Campaign.update({ sent_at: new Date() }, { where: { uid: campaign_id } });
+    await Campaign.update({ status: 'running' }, { where: { uid: campaign_id } });
 
     let campaignReport;
     if ( !reportId ) {
@@ -44,6 +44,9 @@ jobQueue.process(async (job, done) => {
         sent_porcent: lastEmittedProgress,
         run_at: new Date(),
       });
+      
+      job.data.campaignReportUid = campaignReport.uid;
+
     } else {
       campaignReport = await CampaignReport.findOne({where: { uid: reportId}})
 
@@ -60,16 +63,12 @@ jobQueue.process(async (job, done) => {
 
       try {
         const campaignStatus = await redisClient.hGet(`campaign_${campaign_id}`, 'status');
-        logger.info(`Estado actual de la campaña ${campaign_id}: ${campaignStatus}`);
+        logger.info(`Campaign ${campaign_id} status: ${campaignStatus}`);
 
         if (campaignStatus === 'stopped' || campaignStatus === 'cancelled') {
-          logger.info(`Campaña ${campaign_id} ha sido ${campaignStatus}. Terminando el job.`);
-  
-          await campaignReport.update({
-            status: campaignStatus, 
-            sent_porcent: (messagesSent / totalMessages) * 100,
-          });
-
+          logger.info(`Campaign ${campaign_id} has been ${campaignStatus}. Ending job.`);
+          
+          // Notify frontend
           if (io) {
             io.to(socketId).emit('campaigns', {
               event: 'stop',
@@ -78,14 +77,17 @@ jobQueue.process(async (job, done) => {
             });
           }
 
-          return done(new Error('Paused: The campaign was stopped intentionally.'), campaignReport);
+          return done(new Error('Paused: The campaign was stopped intentionally.'));
         }
+
+        // Send message
         const recipientNumber = `${item.Whatsapp}@c.us`; 
         await client.sendMessage(recipientNumber, item.Mensaje);
 
         messagesSent += 1;
         const progress = (messagesSent / totalMessages) * 100;
-
+        
+        // Save progress
         await redisClient.hSet(`campaign_${campaign_id}`, 'progress', `${progress.toFixed(2)}%`);
 
         // Every 10%
@@ -93,7 +95,8 @@ jobQueue.process(async (job, done) => {
           lastEmittedProgress = progress;
 
           await campaignReport.update({ sent_porcent: progress });
-
+          
+          // Notify frontend about sending progress
           if (io) {
             io.to(socketId).emit('campaigns', {
               event: 'progress',
@@ -107,9 +110,9 @@ jobQueue.process(async (job, done) => {
         await new Promise((resolve) => setTimeout(resolve, 5000));
 
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+        const errorMessage = error instanceof Error ? error.message : 'Unknow error';
 
-        logger.error(`Error procesando el mensaje número ${messagesSent}: ${errorMessage}`, {
+        logger.error(`An error happened processing message ${messagesSent}: ${errorMessage}`, {
           campaign_id,
           jobId: job.id,
           data: error,
@@ -123,7 +126,7 @@ jobQueue.process(async (job, done) => {
         if (io) {
           io.to(socketId).emit('campaigns', {
             event: 'failed',
-            error: `Error al procesar el mensaje número ${messagesSent}: ${errorMessage}`,
+            error: `Error processing message ${messagesSent}: ${errorMessage}`,
             campaign_id,
           });
         }
@@ -132,48 +135,37 @@ jobQueue.process(async (job, done) => {
       }
     }
 
-    await Campaign.update({ sent_at: new Date() }, { where: { uid: campaign_id } });
     await campaignReport.update({ status: 'sent', sent_porcent: 100 });
 
-    done(null, campaignReport);
+    done(null);
 
   } catch (error) {
+    
     if (error instanceof Error) {
       logger.error(`Error al procesar la campaña ${campaign_id}: ${error.message}`);
       done(new Error(`Error al procesar la campaña ${campaign_id}: ${error.message}`));
-    } else {
+    } 
+    
+    else {
       logger.error(`Error desconocido al procesar la campaña ${campaign_id}`);
       done(new Error(`Error desconocido al procesar la campaña ${campaign_id}`));
     }
-  }finally {
-    // Cerrar el navegador Puppeteer al finalizar
-    try {
-      if (client && typeof client.pupBrowser === 'function') {
-        const browser = await client.pupBrowser();
-        await browser.close();  // Cerrar el navegador Puppeteer
-        logger.info(`Navegador Puppeteer cerrado para el usuario ${user_id}`);
-      }
-    } catch (error) {
-      logger.error(`Error al cerrar el navegador Puppeteer para el usuario ${user_id}:`, { error });
-    }
+
   }
 });
 
 jobQueue.on('completed', async (job) => {
-  const { campaign_id, user_id } = job.data;
+  const { campaign_id, user_id, campaignReportUid } = job.data;
   const {socketId, client} = userState.get(user_id);
-    
-
 
   try {
-    await Campaign.update({ sent_at: new Date() }, { where: { uid: campaign_id } });
-
-    if (io) {
-      io.to(socketId).emit('campaigns', {
-        event: 'completed',
-        campaign_id,
-      });
-    }
+    // Save progress in Report
+    await CampaignReport.update(
+      { status: 'sent', sent_porcent: 100 },
+      { where: { uid: campaignReportUid } }
+    );
+    // Save status in Campaign data
+    await Campaign.update({ sent_at: new Date(), status: 'active' }, { where: { uid: campaign_id } });
 
     // Remove redis state
     await redisClient.del(`campaign_${campaign_id}`);
@@ -184,35 +176,52 @@ jobQueue.on('completed', async (job) => {
       delete newState[client];
       userState.set(user_id, newState);
     }
+
+    // Delete What's App client and session 
     await client.logout();
     await client.destroy();
+    
+    // Notify the front
+    if (io) {
+      io.to(socketId).emit('campaigns', {
+        event: 'completed',
+        campaign_id,
+      });
+    }
 
     logger.info(`Job ${job.id} completed successfully.`);
   } catch (error) {
     if (error instanceof Error) {
+      
       logger.error(`Error marking job ${job.id} as completed: ${error.message}`, {
         jobId: job.id,
         campaignId,
         data: error,
       });
+
     } else {
-      logger.error(`Error desconocido al marcar el trabajo ${job.id} como completado`);
+      logger.error(`Unknow error happened while handling failure on job ${job.id}`);
     }
   }
 });
 
 jobQueue.on('failed', async (job, err) => {
-  const { campaign_id, user_id, campaignReport } = job.data;
+  const { campaign_id, user_id, campaignReportUid } = job.data;
   const {socketId, client} = userState.get(user_id);
 
   try {
     const progress = await redisClient.hGet(`campaign_${campaign_id}`, 'progress');
 
+    // Save progress for report
     await CampaignReport.update(
-      { status: 'stopped', sent_porcent: Number(progress) || 0 },
-      { where: { uid: campaignReport } }
+      { status: 'stopped', sent_porcent: parseFloat(progress?.replace('%', '') || '0') },
+      { where: { uid: campaignReportUid } }
     );
+    
+    // Save status for campaign
+    await Campaign.update({ status: 'active' }, { where: { uid: campaign_id } });
 
+    // Notify front
     if (io) {
       io.to(socketId).emit('campaigns', {
         event: 'failed',
@@ -242,13 +251,15 @@ jobQueue.on('failed', async (job, err) => {
 
   } catch (error) {
     if(error instanceof Error) {
+
       logger.error(`Error handling job failure for job ${job.id}: ${error.message}`, {
         jobId: job.id,
         campaign_id,
         data: error,
       });
+
     } else {
-      logger.error(`Error desconocido al manejar la falla del trabajo para el trabajo ${job.id}`);
+      logger.error(`Unknow error happened while handling failure on job ${job.id}`);
     }
   }
 });

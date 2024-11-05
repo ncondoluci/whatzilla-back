@@ -9,7 +9,7 @@ class Campaign extends Model {
     public user_id!: string;
     public list_id!: string;
     public name!: string;
-    public status!: 'active' | 'disable' | 'running';
+    public status!: 'active' | 'disable' | 'running' | 'stopped';
     public sent_at?: Date;    
 
     // Timestamps automáticos
@@ -54,7 +54,7 @@ Campaign.init({
         allowNull: false,
     },
     status: {
-        type: DataTypes.ENUM('active' , 'disable', 'running'),
+        type: DataTypes.ENUM('active' , 'disable', 'running', 'stopped'),
         allowNull: false,
         defaultValue: 'active',
     },

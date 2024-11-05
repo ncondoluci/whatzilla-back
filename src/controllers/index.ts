@@ -3,7 +3,6 @@ import { authController, registrationController } from '@/controllers/authContro
 
 // Campaigns
 import { 
-    initializeCampaign,
     postCampaign,
     getCampaign,
     patchCampaign,
@@ -56,7 +55,6 @@ export {
     registrationController,
 
     // Campaigns
-    initializeCampaign,
     postCampaign,
     getCampaign,
     getCampaignsList,

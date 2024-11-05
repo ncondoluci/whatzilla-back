@@ -13,6 +13,7 @@ import WhatsAppSession from "@/models/WhatsAppSession";
 import { Client, NoAuth } from "whatsapp-web.js";
 import { logger } from "@/config/logger";
 import { userState } from'@/sockets/socketManager';
+import { stopAndRemoveJob } from "@/queues/campaignJobHandler";
 
 export const postCampaign = async (req: Request, res: Response, next: NextFunction) => {
   const { uid: user_id } = req.user as { uid: string };
@@ -203,82 +204,130 @@ export const uploadCampaign = async (req: Request, res: Response, next: NextFunc
 };
 
 export const startCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const { uid: userId } = req.user as { uid: string };
-  const { uid: campaignId } = req.params;
+  const io = req.app.get("io") as Server;
+  const { uid: user_id } = req.user as { uid: string };
+  const { uid: campaign_id } = req.params;
 
+  const {socketId} = userState.get(user_id);
+
+  let isAuthenticated: Boolean = false;
+  
   try {
-    const campaignProvider = new CampaignProvider(userId);
-    const campaignData = await campaignProvider.getCampaignData(campaignId);
-    const totalMessages = campaignData.length;
-
-    if (totalMessages === 0) {
+    if (!socketId) {
       return sendResponse(res, 200, {
         success: false,
-        message: 'No data found for this campaign.',
+        message: 'Socket ID not found.'
+      });
+    }
+    // Procession the data form a campaign file (xlsx)
+    const campaignProvider = new CampaignProvider(user_id);
+    const campaignData = await campaignProvider.getCampaignData(campaign_id);
+    const totalMessages = campaignData.length;
+
+    if(!campaignData || !totalMessages) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error loading campaign data || Campaign data not found.'
+      });
+    }
+  
+    const client = new Client({
+      authStrategy: new NoAuth(),
+      authTimeoutMs: 30000,
+      qrMaxRetries: 3,
+      puppeteer: {
+        headless: false, 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      }
+    });
+    
+    if (!client) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error creating WhatsApp client.'
       });
     }
 
-    await jobQueue.add({ dataArray: campaignData, totalMessages, campaignId, userId });
+    client.on('ready', async () => {
+      logger.info('Job running.');
 
-    return sendResponse(res, 200, {
-      success: true,
-      message: 'Campaign data processing started',
+      isAuthenticated = true;
+
+      userState.set(user_id, {
+        ...userState.get(user_id),
+        [`client`]: client
+      });
+      
+      await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id });
+
+      // Notify frontend
+      io.to(socketId).emit('whatsApp', {
+        event: 'ready',
+        campaign_id
+      });
+
     });
+
+    client.on('qr', (qr: string) => {
+      setTimeout(async ()=> {
+        if(!isAuthenticated) {
+          logger.info('QR code was not scanned at time | What´s App authentication error.');
+
+          await client.logout();
+          await client.destroy();
+
+          io.to(socketId).emit('whatsApp', {
+            event: 'disconnect',
+            campaign_id
+          });
+        }
+      }, 30000);
+
+      return sendResponse(res, 200, {
+        success: true,
+        message: "QR code generated. Please scan to authenticate.",
+        qr
+      });
+    });
+
+    client.on('auth_failure', (error) => {
+      return sendResponse(res, 200, {
+        success: false,
+        message: "What's App authentication failed.",
+      });
+    });
+
+    await client.initialize();
+
   } catch (error) {
-    next(new AppError({
-      message: 'Failed to start campaign data processing',
-      statusCode: 500,
-      isOperational: false,
-      data: error
-    }));
+    next(new AppError({ message: "An error occurred while initializing campaign.", statusCode: 500, isOperational: false, data: error }));
   }
 };
 
 export const stopCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const io = req.app.get("io") as Server; 
-  const { uid: campaignId } = req.params;
-  
+  const { uid: campaign_id } = req.params;
+
   try {
-    const campaignExists = await redisClient.exists(`campaign:${campaignId}`);
-    if (!campaignExists) {
+    const isRunning = await Campaign.findOne({where: {uid: campaign_id, status: 'running'}})
+  
+    if(!isRunning) {
       return sendResponse(res, 200, {
         success: false,
-        message: `Campaign ${campaignId} does not exist.`
+        message: `Campaign with id ${campaign_id} not running`
       });
     }
 
-    let progress = await redisClient.hGet(`campaign:${campaignId}`, 'progress');
-    if (progress === null || progress === undefined) {
-      progress = '0';
+    const { success,  message } = await stopAndRemoveJob(campaign_id);
+
+    if(success) {
+      return sendResponse(res, 200, {
+        success,
+        message
+      });
     }
-    let numericProgress = parseFloat(progress); 
-    
-    if (isNaN(numericProgress)) {
-      numericProgress = 0;
-    } 
-
-    await CampaignReport.update(
-      { status: 'stopped', sent_porcent: numericProgress }, 
-      { where: { campaign_id: campaignId } }
-    );
-
-    await redisClient.hSet(`campaign:${campaignId}`, 'status', 'stopped');
-
-    // To the user
-    io.to(`campaign_${campaignId}`).emit('campaigns', { campaignId, status: 'stopped' });
-
-    return sendResponse(res, 200, {
-      success: true, 
-      message: `Campaign ${campaignId} paused`
-    });
 
   } catch (error) {
-    next(new AppError({
-      message: `Error pausing campaign`, 
-      statusCode: 500, 
-      isOperational: false, 
-      data: error
-    }));
+    next(new AppError({message: 'Error happened pausing campaign', statusCode: 500, isOperational: false, data: error}))
   }
 };
 
@@ -425,80 +474,6 @@ export const createWhatsAppSession = async (req: Request, res: Response, next: N
       isOperational: false,  
       data: error
     }));
-  }
-};
-
-export const initializeCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const io = req.app.get("io") as Server;
-  const { uid: user_id } = req.user as { uid: string };
-  const { uid: campaign_id } = req.params;
-
-  const socketId = userState.get(user_id);
-  
-  try {
-    if (!socketId) {
-      return sendResponse(res, 200, {
-        success: false,
-        message: 'Socket ID not found.'
-      });
-    }
-    // Procession the data form a campaign file (xlsx)
-    const campaignProvider = new CampaignProvider(user_id);
-    const campaignData = await campaignProvider.getCampaignData(campaign_id);
-    const totalMessages = campaignData.length;
-
-    if(!campaignData || !totalMessages) {
-      return sendResponse(res, 200, {
-        success: false,
-        message: 'Error loading campaign data || Campaign data not found.'
-      });
-    }
-  
-    const client = new Client({
-      authStrategy: new NoAuth(),
-      puppeteer: {
-        headless: false, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      }
-    });
-    
-    if (!client) {
-      return sendResponse(res, 200, {
-        success: false,
-        message: 'Error creating WhatsApp client.'
-      });
-    }
-
-    client.on('ready', async () => {
-      logger.info('Job running.');
-
-      userState.set(user_id, {
-        ...userState.get(user_id),
-        [`client`]: client
-      });
-      
-      await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id });
-    });
-
-    client.on('qr', (qr: string) => {
-      return sendResponse(res, 200, {
-        success: true,
-        message: "QR code generated. Please scan to authenticate.",
-        qr
-      });
-    });
-
-    client.on('auth_failure', (error) => {
-      return sendResponse(res, 200, {
-        success: false,
-        message: "What's App authentication failed.",
-      });
-    });
-
-    await client.initialize();
-
-  } catch (error) {
-    next(new AppError({ message: "An error occurred while initializing campaign.", statusCode: 500, isOperational: false, data: error }));
   }
 };
 
