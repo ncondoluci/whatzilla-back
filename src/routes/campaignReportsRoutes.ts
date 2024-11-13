@@ -13,13 +13,13 @@ router.get('/:uid', [
     param('uid').not().isEmpty().withMessage('Report UID must not be empty.')
     .isString().withMessage('Report UID must be an string.'),
     validationMiddleware
-], getCampaignReport);
+], getCampaignReports);
 
 router.get('/', [
     JWTValidator,
     param('uid').not().isEmpty().withMessage('Report UID must not be empty.')
     .isString().withMessage('Report UID must be an string.'),
     validationMiddleware
-], getCampaignReports);
+], getCampaignReport);
 
 export default router;

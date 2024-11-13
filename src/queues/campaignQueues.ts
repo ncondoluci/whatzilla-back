@@ -27,44 +27,56 @@ export const initializeJobQueue = (ioInstance: Server) => {
   io = ioInstance;
 };
 
-jobQueue.process(async (job, done) => {
-  const { dataArray, totalMessages, startFrom = 0, campaign_id, reportId = '', user_id , } = job.data;
-  const {socketId, client} = userState.get(user_id);
+jobQueue.process(10, async (job, done) => {
+  const { dataArray, totalMessages, startFrom = 0, campaign_id, user_id, sessionId } = job.data;
+  let { reportId = ''} = job.data;
+  
+  const user = userState.get(user_id);
+  const client = user[`session_${sessionId}`];
+  const socketId = user.socketId;
+
   let messagesSent = startFrom; 
   let lastEmittedProgress = (startFrom / totalMessages) * 100;
 
   try {
-    await Campaign.update({ status: 'running' }, { where: { uid: campaign_id } });
-
+    // Generate campaign report in DDBB
     let campaignReport;
     if ( !reportId ) {
       campaignReport = await CampaignReport.create({
         campaign_id,
         status: 'running',
-        sent_porcent: lastEmittedProgress,
+        sent_percent: lastEmittedProgress,
         run_at: new Date(),
       });
       
-      job.data.campaignReportUid = campaignReport.uid;
+      reportId = campaignReport.uid; ;
 
     } else {
       campaignReport = await CampaignReport.findOne({where: { uid: reportId}})
-
+      
       if (!campaignReport) {
         throw new Error(`Campaign report with uid ${reportId} not found`);
       }
-    }
+      
+      reportId = campaignReport.uid; 
+    };
+
+    job.data.reportId = reportId;
 
 
+    // Set campaign status to "running" and asign report ID to Campaign
+    await Campaign.update({ status: 'running', last_report_id: reportId }, { where: { uid: campaign_id } });
+
+    // Set the campaign status in redis
     await redisClient.hSet(`campaign_${campaign_id}`, 'status', 'running');
 
+    // Process the job - Send campaign
     for (let i = startFrom; i < dataArray.length; i++) {
       const item = dataArray[i];
 
       try {
         const campaignStatus = await redisClient.hGet(`campaign_${campaign_id}`, 'status');
-        logger.info(`Campaign ${campaign_id} status: ${campaignStatus}`);
-
+        
         if (campaignStatus === 'stopped' || campaignStatus === 'cancelled') {
           logger.info(`Campaign ${campaign_id} has been ${campaignStatus}. Ending job.`);
           
@@ -82,7 +94,21 @@ jobQueue.process(async (job, done) => {
 
         // Send message
         const recipientNumber = `${item.Whatsapp}@c.us`; 
-        await client.sendMessage(recipientNumber, item.Mensaje);
+        await client.sendMessage(recipientNumber, item.Mensaje)
+          .then((response) => {
+            logger.info(`Message sent to ${recipientNumber}`);
+            
+            io.to(socketId).emit('campaign', {
+              event: 'sendMessage',
+              campaingId: campaign_id ,
+              data: {chatId: item.Numero, message: item.Mensaje}
+            });
+          })
+          .catch((err:any) => {
+            logger.error(`Mesagge for ${item.Numero} couldn't be sent: ${err}`);
+            // Registrar la falla en redis
+
+          });
 
         messagesSent += 1;
         const progress = (messagesSent / totalMessages) * 100;
@@ -94,7 +120,7 @@ jobQueue.process(async (job, done) => {
         if (progress - lastEmittedProgress >= 10) {
           lastEmittedProgress = progress;
 
-          await campaignReport.update({ sent_porcent: progress });
+          await campaignReport.update({ sent_percent: progress });
           
           // Notify frontend about sending progress
           if (io) {
@@ -118,12 +144,14 @@ jobQueue.process(async (job, done) => {
           data: error,
         });
 
+        // Save report in DDBB
         await campaignReport.update({
           status: 'stopped',
-          sent_porcent: (messagesSent / totalMessages) * 100,
+          sent_percent: (messagesSent / totalMessages) * 100,
         });
 
         if (io) {
+          // Notify frontend about sending progress
           io.to(socketId).emit('campaigns', {
             event: 'failed',
             error: `Error processing message ${messagesSent}: ${errorMessage}`,
@@ -135,7 +163,7 @@ jobQueue.process(async (job, done) => {
       }
     }
 
-    await campaignReport.update({ status: 'sent', sent_porcent: 100 });
+    await campaignReport.update({ status: 'sent', sent_percent: 100 });
 
     done(null);
 
@@ -155,14 +183,16 @@ jobQueue.process(async (job, done) => {
 });
 
 jobQueue.on('completed', async (job) => {
-  const { campaign_id, user_id, campaignReportUid } = job.data;
-  const {socketId, client} = userState.get(user_id);
+  const { campaign_id, user_id, sessionId, reportId } = job.data;
+  const user = userState.get(user_id);
+  const client = user[`session_${sessionId}`];
+  const socketId = user.socketId;
 
   try {
     // Save progress in Report
     await CampaignReport.update(
-      { status: 'sent', sent_porcent: 100 },
-      { where: { uid: campaignReportUid } }
+      { status: 'sent', sent_percent: 100 },
+      { where: { uid: reportId } }
     );
     // Save status in Campaign data
     await Campaign.update({ sent_at: new Date(), status: 'active' }, { where: { uid: campaign_id } });
@@ -170,17 +200,16 @@ jobQueue.on('completed', async (job) => {
     // Remove redis state
     await redisClient.del(`campaign_${campaign_id}`);
 
-    // Delete session data from client Singleton instance
-    const newState = userState.get(user_id);
-    if (newState) {
-      delete newState[client];
-      userState.set(user_id, newState);
-    }
-
     // Delete What's App client and session 
     await client.logout();
     await client.destroy();
-    
+
+    // Delete session data from client Singleton instance
+    if (user) {
+      delete user[`session_${sessionId}`];
+      userState.set(user_id, user);
+    }
+
     // Notify the front
     if (io) {
       io.to(socketId).emit('campaigns', {
@@ -195,7 +224,7 @@ jobQueue.on('completed', async (job) => {
       
       logger.error(`Error marking job ${job.id} as completed: ${error.message}`, {
         jobId: job.id,
-        campaignId,
+        campaign_id,
         data: error,
       });
 
@@ -206,20 +235,23 @@ jobQueue.on('completed', async (job) => {
 });
 
 jobQueue.on('failed', async (job, err) => {
-  const { campaign_id, user_id, campaignReportUid } = job.data;
-  const {socketId, client} = userState.get(user_id);
+  const { campaign_id, user_id, sessionId, reportId } = job.data;
+  
+  const user = userState.get(user_id);
+  const client = user[`session_${sessionId}`];
+  const socketId = user.socketId;;
 
   try {
     const progress = await redisClient.hGet(`campaign_${campaign_id}`, 'progress');
 
     // Save progress for report
     await CampaignReport.update(
-      { status: 'stopped', sent_porcent: parseFloat(progress?.replace('%', '') || '0') },
-      { where: { uid: campaignReportUid } }
+      { status: 'stopped', sent_percent: parseFloat(progress?.replace('%', '') || '0') },
+      { where: { uid: reportId } }
     );
     
     // Save status for campaign
-    await Campaign.update({ status: 'active' }, { where: { uid: campaign_id } });
+    await Campaign.update({ status: 'stopped' }, { where: { uid: campaign_id } });
 
     // Notify front
     if (io) {
@@ -233,15 +265,15 @@ jobQueue.on('failed', async (job, err) => {
     // Remove redis state
     await redisClient.del(`campaign_${campaign_id}`);
 
-    // Delete session data from client Singleton instance
-    const newState = userState.get(user_id);
-    if (newState) {
-      delete newState[client];
-      userState.set(user_id, newState);
-    }
-
+    // Delete What's App client and session 
     await client.logout();
     await client.destroy();
+
+    // Delete session data from client Singleton instance
+    if (user) {
+      delete user[`session_${sessionId}`];
+      userState.set(user_id, user);
+    }
 
     logger.error(`Job ${job.id} failed with error: ${err.message}`, {
       jobId: job.id,

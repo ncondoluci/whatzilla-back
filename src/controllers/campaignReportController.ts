@@ -1,3 +1,4 @@
+import { logger } from "@/config/logger";
 import CampaignReport from "@/models/CampaignReport";
 import { AppError } from "@/providers/ErrorProvider";
 import { sendResponse } from "@/utils/customResponse";
@@ -28,6 +29,7 @@ export const getCampaignReport = async (req: Request, res: Response, next: NextF
 
 export const getCampaignReports = async (req: Request, res: Response, next: NextFunction) => {
     const { uid: campaignId} = req.params;
+    logger.info(campaignId)
 
     try {
         const reports = await CampaignReport.findAll({ where: { campaign_id: campaignId } });

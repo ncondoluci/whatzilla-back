@@ -8,6 +8,9 @@ import WhatsAppSession from '@/models/WhatsAppSession';
 User.hasMany(Campaign, { foreignKey: 'user_id' });
 Campaign.belongsTo(User, { foreignKey: 'user_id' });
 
+Campaign.belongsTo(CampaignReport, { foreignKey: 'last_report_id', as: 'lastReport' });
+CampaignReport.hasOne(Campaign, { foreignKey: 'last_report_id', as: 'campaign' });
+
 User.hasMany(WhatsAppSession, { foreignKey: 'user_id', as: 'whatsappSessions'});
 WhatsAppSession.belongsTo(User, { foreignKey: 'user_id', as: 'user'});
 

@@ -9,8 +9,8 @@ export const stopAndRemoveJob = async (campaign_id: string) => {
 
             await redisClient.hSet(`campaign_${campaign_id}`, 'status', 'stopped');
             
-            return {success: true, message: `job for campaign ${campaign_id} stopped and removed`};
+            return {success: true, message: `Campaign ${campaign_id} stopped.`};
         }
 
-    return {success: false, message: `Job non running for campaign with id ${campaign_id}`};
+    return {success: false, message: `Campaign ${campaign_id} not running.`};
 }

@@ -65,11 +65,6 @@ router.delete('/:uid', [
     validationMiddleware
 ], deleteCampaign);
 
-router.post('/createWhatsAppSession', [
-    JWTValidator,
-    validationMiddleware
-], createWhatsAppSession)
-
 router.post('/start/:uid', [
     JWTValidator,
     param('uid')

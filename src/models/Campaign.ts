@@ -2,12 +2,14 @@ import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/db';
 import User from './User';
 import List from './List';
+import CampaignReport from './CampaignReport';
 
 class Campaign extends Model {
     public id!: number;
     public uid!: string; // UUID
     public user_id!: string;
     public list_id!: string;
+    public last_report_id!: string;
     public name!: string;
     public status!: 'active' | 'disable' | 'running' | 'stopped';
     public sent_at?: Date;    
@@ -48,6 +50,16 @@ Campaign.init({
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL',
+    },
+    last_report_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: CampaignReport,
+            key: 'uid',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
     },
     name: {
         type: DataTypes.STRING,

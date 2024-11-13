@@ -15,7 +15,6 @@ import {
     campaignReportsRoutes,
     listsRoutes,
     subscribersRoutes,
-    whatsappSessions,
     testsRoutes 
 } from '@/routes';
 
@@ -152,7 +151,6 @@ class Server {
         this.app.use(this.paths.lists, listsRoutes);
         this.app.use(this.paths.users, usersRoutes);
         this.app.use(this.paths.subscribers, subscribersRoutes);
-        this.app.use(this.paths.whatsappSessions, whatsappSessions);
         this.app.use(this.paths.tests, testsRoutes);
 
         // Catch undefined routes
