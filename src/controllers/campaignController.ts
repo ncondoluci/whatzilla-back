@@ -243,7 +243,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
         authTimeoutMs: 60000,
         qrMaxRetries: 1,
         puppeteer: {
-          headless: false, 
+          headless: true, 
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
         }
       });
@@ -385,10 +385,21 @@ export const stopCampaign = async (req: Request, res: Response, next: NextFuncti
 };
 
 export const resumeCampaign = async (req: Request, res: Response, next: NextFunction) => {
+  const io = req.app.get("io") as Server;
   const { uid: userId } = req.user as { uid: string };
   const { uid: campaignId } = req.params;
-  console.log('CampaignId: ', campaignId);
+
   try {
+
+    // Global users state
+    const { socketId } = userState.get(userId);
+    if (!socketId) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Socket ID not found.'
+      });
+    }
+
     // Load the partial sent campaign consulting last report
     const campaign = await Campaign.findOne({ where: { uid: campaignId}});
     if(!campaign) {
@@ -399,19 +410,17 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
     }
 
     const lastReportId = campaign.last_report_id;
-    console.log('Last Report ID:',  lastReportId);
-
     const campaignReport = await CampaignReport.findOne({ where: { uid: lastReportId } });
     if(!campaignReport) {
       return sendResponse(res, 200, {
         success: false,
-        message: `There is no campaign stopped with the uid ${lastReportId} to resume.`
+        message: `There is no campaign stopped with the uid ${lastReportId} to resume (1).`
       });
     }
     if (campaignReport.status != 'stopped') {
       return sendResponse(res, 200, {
         success: false,
-        message: `There is no campaign stopped with the uid ${lastReportId} to resume.`
+        message: `There is no campaign stopped with the uid ${lastReportId} to resume(2).`
       });
     }
 
@@ -432,29 +441,136 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
     const startFrom = Math.floor((progress / 100) * totalMessages);
     const messagesToSend = campaignData.slice(startFrom);
 
-    // Enqueue job
-    await jobQueue.add({
-      campaignId: campaignReport.campaign_id,
-      lastReportId,
-      userId,
-      dataArray: messagesToSend,
-      totalMessages,
-      startFrom,
+    // Create what's app client
+    let isAuthenticated: Boolean = false;
+    const client = new Client({
+      authStrategy: new NoAuth(),
+      authTimeoutMs: 60000,
+      qrMaxRetries: 1,
+      puppeteer: {
+        headless: true, 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      }
     });
 
-    // Update campaignReport status 
-    await CampaignReport.update(
-      { status: 'running' },
-      { where: { campaign_id: campaignId } }
-    );
+    if (!client) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error creating WhatsApp client.'
+      });
+    }
 
-    // Set campaign status in redis
-    await redisClient.hSet(`campaign:${campaignId}`, 'status', 'running');
+    client.on('qr', (qr: String) => {
+      setTimeout(async ()=> {
+        if(!isAuthenticated) {
+          logger.info('QR code was not scanned at time | What´s App authentication error.');
 
-    return sendResponse(res, 200, {
-      success: true,
-      message: `Campaign ${campaignId} resumed from ${progress}%`,
+          await client.logout();
+          await client.destroy();
+
+          io.to(socketId).emit('whatsApp', {
+            event: 'disconnect',
+            campaignId
+          });
+        }
+      }, 60000);
+
+      return sendResponse(res, 200, {
+        success: true,
+        message: "QR code generated. Please scan to authenticate.",
+        qr
+      });
     });
+
+    client.on('ready', async () => {
+      logger.info('Job resumed.');
+
+      isAuthenticated = true;
+
+      const sessionId = uuid();
+      userState.set(userId, {
+        ...userState.get(userId),
+        [`session_${sessionId}`]: client
+      });
+
+      // Enqueue job
+      await jobQueue.add({
+        campaign_id: campaignReport.campaign_id,
+        reportId: lastReportId,
+        user_id: userId,
+        sessionId,
+        dataArray: messagesToSend,
+        totalMessages,
+        startFrom,
+      });
+
+      // Update campaignReport status 
+      await CampaignReport.update(
+        { status: 'running' },
+        { where: { uid: lastReportId } }
+      );
+
+      // Notify frontend
+      io.to(socketId).emit('whatsApp', {
+        event: 'ready',
+        campaignId
+      });
+    });
+
+    // Listen to message status
+    client.on('message_ack', async (message: string, ack: number) => {
+      const campaignKey = `campaign_${campaignId}`;
+    
+      switch (ack) {
+        case 0:
+          logger.error('ACK_ERROR: Error sending the message.');
+          const messagesWithErrors = await redisClient.hGet(campaignKey, 'errors');
+          redisClient.hSet(campaignKey, 'errors', parseInt(messagesWithErrors || '0', 10) + 1);
+          break;
+    
+        case 1:
+          // logger.info('ACK_PENDING: Message is pending.');
+          const pendingMessages = await redisClient.hGet(campaignKey, 'pending');
+          redisClient.hSet(campaignKey, 'pending', parseInt(pendingMessages || '0', 10) + 1);
+          break;
+    
+        case 2:
+          logger.info('ACK_SERVER: Message received by WhatsApp server.');
+          const serverReceived = await redisClient.hGet(campaignKey, 'received_by_server');
+          redisClient.hSet(campaignKey, 'received_by_server', parseInt(serverReceived || '0', 10) + 1);
+          break;
+    
+        case 3:
+          // logger.info('ACK_DEVICE: Message delivered to the recipient’s device.');
+          const deliveredMessages = await redisClient.hGet(campaignKey, 'delivered');
+          redisClient.hSet(campaignKey, 'delivered', parseInt(deliveredMessages || '0', 10) + 1);
+          break;
+    
+        case 4:
+          logger.info('ACK_READ: Message read by the recipient.');
+          const readMessages = await redisClient.hGet(campaignKey, 'read');
+          redisClient.hSet(campaignKey, 'read', parseInt(readMessages || '0', 10) + 1);
+          break;
+    
+        case 5:
+          logger.info('ACK_PLAYED: Audio message played by the recipient.');
+          const playedMessages = await redisClient.hGet(campaignKey, 'played');
+          redisClient.hSet(campaignKey, 'played', parseInt(playedMessages || '0', 10) + 1);
+          break;
+    
+        default:
+          logger.info('Unknown ack status:', ack);
+      }
+    });
+
+    client.on('auth_failure', (error) => {
+      return sendResponse(res, 200, {
+        success: false,
+        message: "What's App authentication failed.",
+      });
+    });
+
+    await client.initialize();
 
   } catch (error) {
     next(new AppError({
@@ -466,42 +582,29 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const cancelCampaign = async (req: Request, res: Response, next: NextFunction) => {
-  const io = req.app.get("io") as Server; 
+export const resetCampaign = async (req: Request, res: Response, next: NextFunction) => {
   const { uid: campaignId } = req.params;
-  const userId = req.body.userId;
 
   try {
-    const campaignExists = await redisClient.exists(`campaign:${campaignId}`);
-    if (!campaignExists) {
-      return sendResponse(res, 200, {
-        success: false,
-        message: `Campaign ${campaignId} does not exist.`
-      });
-    }
-
-    const campaign = await Campaign.findOne({ where: { uid: campaignId } });
-    const progress = await redisClient.hGet(`campaign:${campaignId}`, 'progress');
-
-    await CampaignReport.update(
-      { status: 'cancelled', sent_porcent: progress }, 
-      { where: { campaign_id: campaignId } }
+    const campaign = await Campaign.update(
+      { status: 'active'},
+      { 
+        where: { uid: campaignId }, 
+        returning: true
+      }
     );
 
-    io.to(`user_${userId}`).emit('campaigns', {
-      event: 'cancell',
-      campaignId,
-      progress: `${parseFloat(`${progress}`).toFixed(2)}%`,
-    });
-
-    const job = await jobQueue.getJob(campaignId);
-    if (job) {
-      await job.remove();
-    }
+    if(!campaign) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: "Campaign not found",
+      });
+    };
 
     return sendResponse(res, 200, {
       success: true, 
-      message: `Campaign ${campaignId} cancelled`
+      message: `Campaign ${campaignId} reseted`,
+      campaign
     });
 
   } catch (error) {
@@ -511,6 +614,6 @@ export const cancelCampaign = async (req: Request, res: Response, next: NextFunc
       isOperational: false,
       data: error
     }));
-  }
+  };
 };
 

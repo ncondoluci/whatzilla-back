@@ -29,9 +29,16 @@ import '@/models/associations';
 // Providers
 import { AppError } from '@/providers/ErrorProvider';
 
+// Queues and jobs
+import { initializeQueueSocket } from '@/queues/campaignQueues';
+import { safeJobTerminator } from '@/queues/safeJobsTerminator';
 // Utils
 import { logger } from '@/config/logger';
-import { initializeJobQueue } from '@/queues/campaignQueues';
+import { createSmtpTransport } from '@/config/nodeMailer';
+import { Transport } from 'nodemailer';
+import EmailService from '@/services/EmailService';
+import { errorTemplate } from '@/templates/errorTemplate';
+
 
 class Server {
     public app: express.Application;
@@ -49,8 +56,34 @@ class Server {
         tests: string;
     };
 
-    private async shutdown(reason: string) {
+    private async shutdown(reason: string, error?: string) {
         console.log(`Shutting down due to ${reason}`);
+
+        try {
+            // Notifies admin via email
+            const transporter: Transport = createSmtpTransport();
+            const mailer = new EmailService(transporter);
+            const template = errorTemplate(`Shutting down due to: ${reason}`, error ?? reason);
+            const emailData ={
+                to: 'nicolas@cantalupe.com.ar',
+                from: process.env.NODE_MAILER_USER,
+                subject: `Whatzilla shutting down due to:  ${reason}`,
+                html: template
+            }
+            await mailer.sendMail(emailData);
+            
+            console.log('ENotification email sent.');
+        } catch (err) {
+            logger.error('Error during email sending', { message: err instanceof Error ? err.message : String(err) });
+        }
+
+        try {
+            // Closes all jobs
+            await safeJobTerminator();
+            console.log('All jobs terminated safely.');
+        } catch (err) {
+            logger.error('Error during job termination', { message: err instanceof Error ? err.message : String(err) });
+        }
     
         this.server.close(async () => {
             console.log('HTTP server closed.');
@@ -73,7 +106,7 @@ class Server {
         setTimeout(() => {
             console.error('Forced shutdown due to timeout.');
             process.exit(1);  // Force shutdown after 10 seconds if not done
-        }, 10000);
+        }, 30000);
     };
     
     constructor() {
@@ -106,29 +139,47 @@ class Server {
         this.middlewares();
         this.routes();
         this.sockets();
-        this.initializeQueues();
+        this.initializeQueueSocket();
     }
 
     async systemListeners() {
-        process.on('uncaughtException', (err) => {
+        // Compatibilidad con Windows para capturar SIGINT de manera confiable
+        if (process.platform === "win32") {
+            const rl = require("readline").createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+
+            rl.on("SIGINT", async () => {
+                await this.shutdown('Uncaught Exception');
+                process.emit("SIGINT");
+            });
+        } else {
+            process.on('SIGINT', async () => {
+                console.log('SIGINT received (Ctrl+C). Shutting down gracefully...');
+                process.exit(0); // Cerrar el proceso después del cierre ordenado
+            });
+        }
+
+        // Manejar excepciones no capturadas
+        process.on('uncaughtException', async (err) => {
             logger.error('Uncaught Exception!', { message: err.message, stack: err.stack });
-            this.shutdown('Uncaught Exception');
+            await this.shutdown('Uncaught Exception', err.message);
         });
 
-        process.on('unhandledRejection', (reason: Error) => {
+        // Manejar promesas rechazadas sin manejar
+        process.on('unhandledRejection', async (reason: Error) => {
             logger.error('Unhandled Rejection!', { message: reason.message, stack: reason.stack });
-            this.shutdown('Unhandled Rejection');
+            await this.shutdown('Unhandled Rejection', reason.message);
         });
 
-        process.on('SIGTERM', () => {
+        // Manejar señal SIGTERM (cierre por el sistema)
+        process.on('SIGTERM', async () => {
             console.log('SIGTERM received. Shutting down gracefully...');
-            this.shutdown('SIGTERM');
+            await this.shutdown('SIGTERM');
+            process.exit(0); // Cerrar el proceso después del cierre ordenado
         });
 
-        process.on('SIGINT', () => {
-            console.log('SIGINT received (Ctrl+C). Shutting down gracefully...');
-            this.shutdown('SIGINT');
-        });
     }
 
     async connectDB() {
@@ -139,8 +190,8 @@ class Server {
         initializeSockets(this.io);
     }
 
-    private initializeQueues() {
-        initializeJobQueue(this.io);
+    private initializeQueueSocket() {
+        initializeQueueSocket(this.io);
     }
 
     private routes() {

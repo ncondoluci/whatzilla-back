@@ -12,7 +12,7 @@ import {
     startCampaign,
     stopCampaign,
     resumeCampaign,
-    cancelCampaign
+    resetCampaign
 } from '@/controllers/campaignController';
 
 import {
@@ -41,7 +41,12 @@ import {
     getUser
 } from '@/controllers/userController';
 
-import { readCampaignFile } from './testsController';
+// Tests
+import { 
+    readCampaignFile,
+    throwUncaughtException,
+    sendMail
+} from './testsController';
 
 export {
     // Authentication
@@ -58,7 +63,7 @@ export {
     startCampaign,
     stopCampaign,
     resumeCampaign,
-    cancelCampaign,
+    resetCampaign,
 
     // CampaignReports
     getCampaignReport,
@@ -80,5 +85,7 @@ export {
     getUser,
 
     // Test Controllers
-    readCampaignFile
+    readCampaignFile,
+    throwUncaughtException,
+    sendMail
 };

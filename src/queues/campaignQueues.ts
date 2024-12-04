@@ -6,7 +6,7 @@ import CampaignReport from '@/models/CampaignReport';
 import { logger } from '@/config/logger';
 import { userState } from '@/sockets/socketManager';
 
-const jobQueue = new Queue('jobQueue', {
+export const jobQueue = new Queue('jobQueue', {
   redis: {
     host: '127.0.0.1',
     port: 6379,
@@ -23,7 +23,7 @@ const jobQueue = new Queue('jobQueue', {
 
 let io: Server;
 
-export const initializeJobQueue = (ioInstance: Server) => {
+export const initializeQueueSocket = (ioInstance: Server) => {
   io = ioInstance;
 };
 
@@ -35,9 +35,6 @@ jobQueue.process(10, async (job, done) => {
   const client = user[`session_${sessionId}`];
   const socketId = user.socketId;
 
-  let messagesSent = startFrom; 
-  let lastEmittedProgress = (startFrom / totalMessages) * 100;
-
   try {
     // Generate campaign report in DDBB
     let campaignReport;
@@ -45,39 +42,39 @@ jobQueue.process(10, async (job, done) => {
       campaignReport = await CampaignReport.create({
         campaign_id,
         status: 'running',
-        sent_percent: lastEmittedProgress,
         run_at: new Date(),
       });
       
-      reportId = campaignReport.uid; ;
+      reportId = campaignReport.uid;
+
+      job.data.reportId = reportId;
+      await job.update(job.data);
 
     } else {
-      campaignReport = await CampaignReport.findOne({where: { uid: reportId}})
+      campaignReport = await CampaignReport.findOne({where: { uid: reportId}});
       
       if (!campaignReport) {
         throw new Error(`Campaign report with uid ${reportId} not found`);
       }
-      
-      reportId = campaignReport.uid; 
     };
-
-    job.data.reportId = reportId;
-
-
+    
     // Set campaign status to "running" and asign report ID to Campaign
     await Campaign.update({ status: 'running', last_report_id: reportId }, { where: { uid: campaign_id } });
 
     // Set the campaign status in redis
     await redisClient.hSet(`campaign_${campaign_id}`, 'status', 'running');
 
+    let messagesSent = startFrom; 
+    let lastEmittedProgress = (startFrom / totalMessages) * 100;
     // Process the job - Send campaign
     for (let i = startFrom; i < dataArray.length; i++) {
       const item = dataArray[i];
 
       try {
         const campaignStatus = await redisClient.hGet(`campaign_${campaign_id}`, 'status');
+        const exitJob = await redisClient.hGet('GLOBAL', 'exitJob');
         
-        if (campaignStatus === 'stopped' || campaignStatus === 'cancelled') {
+        if (campaignStatus === 'stopped' || exitJob === 'true') {
           logger.info(`Campaign ${campaign_id} has been ${campaignStatus}. Ending job.`);
           
           // Notify frontend

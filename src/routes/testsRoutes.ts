@@ -1,14 +1,17 @@
-import { readCampaignFile } from "@/controllers";
+import { sendMail, throwUncaughtException } from "@/controllers";
 import { JWTValidator, validationMiddleware } from "@/middlewares";
-import jobQueue from "@/queues/campaignQueues";
-import { sendResponse } from "@/utils/customResponse";
 import { Router } from "express";
 
 const router = Router();
 
-router.post('/:uid', [
+router.post('/sendmail', [
     JWTValidator,
     validationMiddleware
-], readCampaignFile);
+], sendMail);
+
+router.post('/throwError', [
+    JWTValidator,
+    validationMiddleware
+], throwUncaughtException);
 
 export default router;
