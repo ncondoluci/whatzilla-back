@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { body, param } from "express-validator";
-import { fileValidator, JWTValidator, validationMiddleware } from "@/middlewares";
+import { fileTypeValidator, JWTValidator, validationMiddleware } from "@/middlewares";
 import { 
     postCampaign, 
     getCampaign, 
@@ -12,6 +12,11 @@ import {
     resumeCampaign, 
     resetCampaign,
 } from "@/controllers";
+import { 
+    preprocessFile,
+    fileMaxRowsAllowed,
+    fileDataValidation
+} from "@/middlewares/campaignFileMiddleware";
 
 const router = Router();
 
@@ -28,7 +33,10 @@ router.post('/', [
 
 router.post('/upload', [
     JWTValidator,
-    fileValidator,
+    fileTypeValidator,
+    preprocessFile,
+    fileMaxRowsAllowed(200),
+    fileDataValidation,
     validationMiddleware
 ], uploadCampaign);
 

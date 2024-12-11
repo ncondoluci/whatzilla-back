@@ -35,7 +35,7 @@ import { safeJobTerminator } from '@/queues/safeJobsTerminator';
 // Utils
 import { logger } from '@/config/logger';
 import { createSmtpTransport } from '@/config/nodeMailer';
-import { Transport } from 'nodemailer';
+import { Transporter } from 'nodemailer';
 import EmailService from '@/services/EmailService';
 import { errorTemplate } from '@/templates/errorTemplate';
 
@@ -61,7 +61,7 @@ class Server {
 
         try {
             // Notifies admin via email
-            const transporter: Transport = createSmtpTransport();
+            const transporter: Transporter = createSmtpTransport();
             const mailer = new EmailService(transporter);
             const template = errorTemplate(`Shutting down due to: ${reason}`, error ?? reason);
             const emailData ={
@@ -133,7 +133,6 @@ class Server {
             }
         });
         this.app.set('io', this.io);
-        
         this.systemListeners();
         this.connectDB();
         this.middlewares();
@@ -143,43 +142,46 @@ class Server {
     }
 
     async systemListeners() {
-        // Compatibilidad con Windows para capturar SIGINT de manera confiable
-        if (process.platform === "win32") {
-            const rl = require("readline").createInterface({
-                input: process.stdin,
-                output: process.stdout
+        if(process.env.NODE_ENV === 'production'){
+            // Compatibilidad con Windows para capturar SIGINT de manera confiable
+                if (process.platform === "win32") {
+                    const rl = require("readline").createInterface({
+                        input: process.stdin,
+                        output: process.stdout
+                    });
+    
+                    rl.on("SIGINT", async () => {
+                        
+                        await this.shutdown('Uncaught Exception');
+                        process.emit("SIGINT");
+                    });
+                } else {
+                    process.on('SIGINT', async () => {
+                        if(process.env.NODE_ENV === 'production'){
+                            console.log('SIGINT received (Ctrl+C). Shutting down gracefully...');
+                            process.exit(0);
+                        }
+                    });
+                }
+            // Manejar excepciones no capturadas
+            process.on('uncaughtException', async (err) => {
+                logger.error('Uncaught Exception!', { message: err.message, stack: err.stack });
+                await this.shutdown('Uncaught Exception', err.message);
             });
-
-            rl.on("SIGINT", async () => {
-                await this.shutdown('Uncaught Exception');
-                process.emit("SIGINT");
+    
+            // Manejar promesas rechazadas sin manejar
+            process.on('unhandledRejection', async (reason: Error) => {
+                logger.error('Unhandled Rejection!', { message: reason.message, stack: reason.stack });
+                await this.shutdown('Unhandled Rejection', reason.message);
             });
-        } else {
-            process.on('SIGINT', async () => {
-                console.log('SIGINT received (Ctrl+C). Shutting down gracefully...');
+    
+            // Manejar señal SIGTERM (cierre por el sistema)
+            process.on('SIGTERM', async () => {
+                console.log('SIGTERM received. Shutting down gracefully...');
+                await this.shutdown('SIGTERM');
                 process.exit(0); // Cerrar el proceso después del cierre ordenado
             });
         }
-
-        // Manejar excepciones no capturadas
-        process.on('uncaughtException', async (err) => {
-            logger.error('Uncaught Exception!', { message: err.message, stack: err.stack });
-            await this.shutdown('Uncaught Exception', err.message);
-        });
-
-        // Manejar promesas rechazadas sin manejar
-        process.on('unhandledRejection', async (reason: Error) => {
-            logger.error('Unhandled Rejection!', { message: reason.message, stack: reason.stack });
-            await this.shutdown('Unhandled Rejection', reason.message);
-        });
-
-        // Manejar señal SIGTERM (cierre por el sistema)
-        process.on('SIGTERM', async () => {
-            console.log('SIGTERM received. Shutting down gracefully...');
-            await this.shutdown('SIGTERM');
-            process.exit(0); // Cerrar el proceso después del cierre ordenado
-        });
-
     }
 
     async connectDB() {

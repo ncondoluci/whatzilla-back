@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppError } from "@/providers/ErrorProvider";
 import { UploadedFile } from "express-fileupload";
 
-export const fileValidator = (req: Request, res: Response, next: NextFunction) => {
+export const fileTypeValidator = (req: Request, res: Response, next: NextFunction) => {
     if (!req.files || !req.files.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }

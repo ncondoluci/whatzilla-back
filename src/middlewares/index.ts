@@ -1,5 +1,11 @@
 import {
-    fileValidator
+    preprocessFile,
+    fileDataValidation,
+    fileMaxRowsAllowed
+} from '@/middlewares/campaignFileMiddleware';
+
+import {
+    fileTypeValidator
 } from '@/middlewares/uploadFileMiddleware';
 
 import {
@@ -16,8 +22,13 @@ import {
 
 
 export {
-    fileValidator,
+    fileTypeValidator,
     globalErrorHandler,
     JWTValidator,
-    validationMiddleware
+    validationMiddleware,
+    
+    // Campaign file
+    preprocessFile,
+    fileDataValidation,
+    fileMaxRowsAllowed
 }

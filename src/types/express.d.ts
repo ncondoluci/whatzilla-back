@@ -10,6 +10,7 @@ declare global {
       files?: {
         file?: UploadedFile;
       };
+      fileData?: string[][];
     }
   }
 }

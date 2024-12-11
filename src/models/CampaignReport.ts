@@ -11,6 +11,7 @@ class CampaignReport extends Model {
     public delivered!: number;
     public read!: number;
     public with_error!: number;
+    public processed!: number;
     public sent_percent!: number;
     public total_batch!: number; 
     public run_at!: Date;
@@ -56,6 +57,11 @@ CampaignReport.init({
         defaultValue: 0,
     },
     read: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+    },
+    processed: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,

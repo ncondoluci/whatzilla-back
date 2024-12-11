@@ -5,6 +5,7 @@ import Campaign from '@/models/Campaign';
 import CampaignReport from '@/models/CampaignReport';
 import { logger } from '@/config/logger';
 import { userState } from '@/sockets/socketManager';
+import { Client } from 'whatsapp-web.js';
 
 export const jobQueue = new Queue('jobQueue', {
   redis: {
@@ -26,6 +27,58 @@ let io: Server;
 export const initializeQueueSocket = (ioInstance: Server) => {
   io = ioInstance;
 };
+
+const registerMessageAck = (client: Client, campaignId: string) => {
+    // Listen to message status
+    client.on(' ', async (message: string, ack: number) => {
+      const campaignKey = `campaign_${campaignId}`;
+
+      switch (ack) {
+        case 0:
+          // logger.error('ACK_ERROR: Error sending the message.');
+          const messagesWithErrors = await redisClient.hGet(campaignKey, 'errors');
+          redisClient.hSet(campaignKey, 'errors', parseInt(messagesWithErrors || '0', 10) + 1);
+          break;
+    
+        case 1:
+          // logger.info('ACK_PENDING: Message is pending.');
+          const pendingMessages = await redisClient.hGet(campaignKey, 'pending');
+          redisClient.hSet(campaignKey, 'pending', parseInt(pendingMessages || '0', 10) + 1);
+          break;
+    
+        case 2:
+          // logger.info('ACK_SERVER: Message received by WhatsApp server.');
+          const serverReceived = await redisClient.hGet(campaignKey, 'received_by_server');
+          redisClient.hSet(campaignKey, 'received_by_server', parseInt(serverReceived || '0', 10) + 1);
+          break;
+    
+        case 3:
+          // logger.info('ACK_DEVICE: Message delivered to the recipient’s device.');
+          const deliveredMessages = await redisClient.hGet(campaignKey, 'delivered');
+          redisClient.hSet(campaignKey, 'delivered', parseInt(deliveredMessages || '0', 10) + 1);
+          break;
+    
+        case 4:
+          // logger.info('ACK_READ: Message read by the recipient.');
+          const readMessages = await redisClient.hGet(campaignKey, 'read');
+          redisClient.hSet(campaignKey, 'read', parseInt(readMessages || '0', 10) + 1);
+          break;
+    
+        default:
+          logger.info('Unknown ack status:', ack);
+      }
+    });
+}
+const redisStatsInitializer = async (campaignKey: string) => {
+  await redisClient.hSet(campaignKey, {
+    status: 'running',
+    errors: 0,
+    pending: 0,
+    received_by_server: 0,
+    delivered: 0,
+    read: 0,
+  });
+}
 
 jobQueue.process(10, async (job, done) => {
   const { dataArray, totalMessages, startFrom = 0, campaign_id, user_id, sessionId } = job.data;
@@ -58,14 +111,20 @@ jobQueue.process(10, async (job, done) => {
       }
     };
     
-    // Set campaign status to "running" and asign report ID to Campaign
+    // DDBB
     await Campaign.update({ status: 'running', last_report_id: reportId }, { where: { uid: campaign_id } });
 
     // Set the campaign status in redis
-    await redisClient.hSet(`campaign_${campaign_id}`, 'status', 'running');
+    redisStatsInitializer(`campaign_${campaign_id}`);
 
-    let messagesSent = startFrom; 
+    // Register messages status
+    registerMessageAck(client, campaign_id);
+
+    // In case of resuming or starting from scratch
+    let messagesProcessed   = startFrom; 
     let lastEmittedProgress = (startFrom / totalMessages) * 100;
+    let messagessWithError  = 0;
+
     // Process the job - Send campaign
     for (let i = startFrom; i < dataArray.length; i++) {
       const item = dataArray[i];
@@ -82,48 +141,50 @@ jobQueue.process(10, async (job, done) => {
             io.to(socketId).emit('campaigns', {
               event: 'stop',
               campaign_id,
-              progress: `${((messagesSent / totalMessages) * 100).toFixed(2)}%`,
+              progress: `${((messagesProcessed / totalMessages) * 100).toFixed(2)}%`,
             });
           }
 
-          return done(new Error('Paused: The campaign was stopped intentionally.'));
+          return done(new Error('Paused: The campaign was stopped intentionally.'), messagesProcessed);
         }
 
         // Send message
-        const recipientNumber = `${item.Whatsapp}@c.us`; 
-        await client.sendMessage(recipientNumber, item.Mensaje)
-          .then((response) => {
+        const recipientNumber = `${'549' + item.NUMERO_COMPLETO}@c.us`; 
+        await client.sendMessage(recipientNumber, item.MENSAJE)
+          .then(() => {
             logger.info(`Message sent to ${recipientNumber}`);
             
             io.to(socketId).emit('campaign', {
               event: 'sendMessage',
-              campaingId: campaign_id ,
-              data: {chatId: item.Numero, message: item.Mensaje}
+              campaignId: campaign_id ,
+              data: {chatId: item.Numero, message: item.MENSAJE}
             });
           })
           .catch((err:any) => {
             logger.error(`Mesagge for ${item.Numero} couldn't be sent: ${err}`);
-            // Registrar la falla en redis
-
+            messagessWithError += 1;
           });
 
-        messagesSent += 1;
-        const progress = (messagesSent / totalMessages) * 100;
+        messagesProcessed += 1;
+        const progress = (messagesProcessed / totalMessages) * 100;
         
         // Save progress
-        await redisClient.hSet(`campaign_${campaign_id}`, 'progress', `${progress.toFixed(2)}%`);
-
+        await redisClient.hSet(`campaign_${campaign_id}`, {
+          progress: `${progress.toFixed(2)}%`,
+          errors: `${messagessWithError}`
+        });
+        
         // Every 10%
         if (progress - lastEmittedProgress >= 10) {
           lastEmittedProgress = progress;
 
-          await campaignReport.update({ sent_percent: progress });
+          await campaignReport.update({ processed: messagesProcessed, with_error: messagessWithError});
           
           // Notify frontend about sending progress
           if (io) {
-            io.to(socketId).emit('campaigns', {
+            io.to(socketId).emit('campaign', {
               event: 'progress',
-              campaign_id,
+              campaignId: campaign_id,
               progress: `${progress.toFixed(2)}%`,
             });
           }
@@ -135,7 +196,7 @@ jobQueue.process(10, async (job, done) => {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknow error';
 
-        logger.error(`An error happened processing message ${messagesSent}: ${errorMessage}`, {
+        logger.error(`An error happened processing message ${messagesProcessed}: ${errorMessage}`, {
           campaign_id,
           jobId: job.id,
           data: error,
@@ -144,14 +205,15 @@ jobQueue.process(10, async (job, done) => {
         // Save report in DDBB
         await campaignReport.update({
           status: 'stopped',
-          sent_percent: (messagesSent / totalMessages) * 100,
+          processed: messagesProcessed,
+          sent_percent: (messagesProcessed - messagessWithError / totalMessages) * 100,
         });
 
         if (io) {
           // Notify frontend about sending progress
           io.to(socketId).emit('campaigns', {
             event: 'failed',
-            error: `Error processing message ${messagesSent}: ${errorMessage}`,
+            error: `Error processing message ${messagesProcessed}: ${errorMessage}`,
             campaign_id,
           });
         }
@@ -180,17 +242,20 @@ jobQueue.process(10, async (job, done) => {
 });
 
 jobQueue.on('completed', async (job) => {
-  const { campaign_id, user_id, sessionId, reportId } = job.data;
+  const { campaign_id, user_id, sessionId, reportId, totalMessages } = job.data;
   const user = userState.get(user_id);
   const client = user[`session_${sessionId}`];
   const socketId = user.socketId;
 
   try {
+    const withError: number = Number(await redisClient.hGet(`campaign_${campaign_id}`, 'errors')) ?? 0;
+    const sent_percent: number = 100 - withError;
     // Save progress in Report
     await CampaignReport.update(
-      { status: 'sent', sent_percent: 100 },
+      { status: 'sent', processed: totalMessages, with_error: withError, sent_percent },
       { where: { uid: reportId } }
     );
+
     // Save status in Campaign data
     await Campaign.update({ sent_at: new Date(), status: 'active' }, { where: { uid: campaign_id } });
 
@@ -209,9 +274,9 @@ jobQueue.on('completed', async (job) => {
 
     // Notify the front
     if (io) {
-      io.to(socketId).emit('campaigns', {
+      io.to(socketId).emit('campaign', {
         event: 'completed',
-        campaign_id,
+        capaignId: campaign_id,
       });
     }
 
@@ -231,19 +296,30 @@ jobQueue.on('completed', async (job) => {
   }
 });
 
-jobQueue.on('failed', async (job, err) => {
-  const { campaign_id, user_id, sessionId, reportId } = job.data;
+jobQueue.on('failed', async (job, err) => { 
+  const { campaign_id, user_id, sessionId, reportId, totalMessages, messagesProcessed } = job.data;
   
   const user = userState.get(user_id);
   const client = user[`session_${sessionId}`];
-  const socketId = user.socketId;;
+  const socketId = user.socketId;
 
   try {
-    const progress = await redisClient.hGet(`campaign_${campaign_id}`, 'progress');
+    const progressRaw = await redisClient.hGet(`campaign_${campaign_id}`, 'progress');
+    const progress = parseFloat(progressRaw?.replace('%', '') || '0');
 
-    // Save progress for report
+    const withError: number = Number(await redisClient.hGet(`campaign_${campaign_id}`, 'errors')) ?? 0;
+
+    const errorPercent = totalMessages > 0 ? (withError / totalMessages) * 100 : 0;
+    const sent_percent: number = Math.max(0, progress - errorPercent);
+
     await CampaignReport.update(
-      { status: 'stopped', sent_percent: parseFloat(progress?.replace('%', '') || '0') },
+      { 
+        status: 'stopped', 
+        processed: messagesProcessed, 
+        with_error: withError, 
+        sent_percent,
+        sent_at: new Date()
+      },
       { where: { uid: reportId } }
     );
     
@@ -252,10 +328,10 @@ jobQueue.on('failed', async (job, err) => {
 
     // Notify front
     if (io) {
-      io.to(socketId).emit('campaigns', {
+      io.to(socketId).emit('campaign', {
         event: 'failed',
         error: err.message,
-        campaign_id,
+        campaignId: campaign_id,
       });
     }
 

@@ -517,52 +517,6 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       });
     });
 
-    // Listen to message status
-    client.on('message_ack', async (message: string, ack: number) => {
-      const campaignKey = `campaign_${campaignId}`;
-    
-      switch (ack) {
-        case 0:
-          logger.error('ACK_ERROR: Error sending the message.');
-          const messagesWithErrors = await redisClient.hGet(campaignKey, 'errors');
-          redisClient.hSet(campaignKey, 'errors', parseInt(messagesWithErrors || '0', 10) + 1);
-          break;
-    
-        case 1:
-          // logger.info('ACK_PENDING: Message is pending.');
-          const pendingMessages = await redisClient.hGet(campaignKey, 'pending');
-          redisClient.hSet(campaignKey, 'pending', parseInt(pendingMessages || '0', 10) + 1);
-          break;
-    
-        case 2:
-          logger.info('ACK_SERVER: Message received by WhatsApp server.');
-          const serverReceived = await redisClient.hGet(campaignKey, 'received_by_server');
-          redisClient.hSet(campaignKey, 'received_by_server', parseInt(serverReceived || '0', 10) + 1);
-          break;
-    
-        case 3:
-          // logger.info('ACK_DEVICE: Message delivered to the recipient’s device.');
-          const deliveredMessages = await redisClient.hGet(campaignKey, 'delivered');
-          redisClient.hSet(campaignKey, 'delivered', parseInt(deliveredMessages || '0', 10) + 1);
-          break;
-    
-        case 4:
-          logger.info('ACK_READ: Message read by the recipient.');
-          const readMessages = await redisClient.hGet(campaignKey, 'read');
-          redisClient.hSet(campaignKey, 'read', parseInt(readMessages || '0', 10) + 1);
-          break;
-    
-        case 5:
-          logger.info('ACK_PLAYED: Audio message played by the recipient.');
-          const playedMessages = await redisClient.hGet(campaignKey, 'played');
-          redisClient.hSet(campaignKey, 'played', parseInt(playedMessages || '0', 10) + 1);
-          break;
-    
-        default:
-          logger.info('Unknown ack status:', ack);
-      }
-    });
-
     client.on('auth_failure', (error) => {
       return sendResponse(res, 200, {
         success: false,

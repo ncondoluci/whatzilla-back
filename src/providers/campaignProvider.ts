@@ -9,6 +9,17 @@ import Campaign from '@/models/Campaign';
 class CampaignProvider {
     private user_id: string;
 
+    private static HEADINGS = [
+        'NOMBRE',
+        'PAIS',
+        'MENSAJE',
+        // 'CODIGO_PAIS',
+        // 'PREFIJO_WHATSAPP',
+        'CODIGO_AREA',
+        'NUMERO_LOCAL',
+        'NUMERO_COMPLETO'
+    ];
+
     private async moveFile(file: UploadedFile, filePath: string): Promise<void> {
         return new Promise((resolve, reject) => {
             file.mv(filePath, (err: any) => {
@@ -108,6 +119,34 @@ class CampaignProvider {
             throw new AppError({ message: 'Failed to read campaign file', statusCode: 500, isOperational: false, data: error });
         }
     }
+    
+    private static checkHeadings(headings: string[]): boolean {
+        return headings.every((heading, i) => heading === this.HEADINGS.at(i));
+    }
+
+    private static checkData(data: string[][]): boolean {
+        return data.every(row => row.every(item => item !== ''));
+    }
+
+    public static validateData(fileData: string[][]): boolean {
+        if (fileData.length <= 1) {
+            throw new AppError({ message: 'File is empty', statusCode: 400 });
+        }
+
+        const headingsValid = this.checkHeadings(fileData[0] || []);
+        if (!headingsValid) {
+            throw new AppError({ message: 'Headings do not match expected values.', statusCode: 400 });
+        }
+
+        const dataValid = this.checkData(fileData.slice(1));
+        if (!dataValid) {
+            throw new AppError({ message: 'Some data rows contain empty values.', statusCode: 400 });
+        }
+
+        return true;
+    }
+    
 }
 
 export default CampaignProvider;
+
