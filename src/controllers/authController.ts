@@ -12,7 +12,7 @@ export const authController = async (req: Request, res: Response, next: NextFunc
     const user = await User.findOne({
       where: { email }
     });
-
+// hola
     if (!user) {
       return sendResponse(res, 200, {
         success: false,
