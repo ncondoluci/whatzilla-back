@@ -3,7 +3,7 @@ name: CI/CD for Whatzilla-Back
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
