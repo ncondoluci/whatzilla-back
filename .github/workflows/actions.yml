@@ -10,16 +10,13 @@ jobs:
     runs-on: [self-hosted, backend]
 
     steps:
-      # 1. Checkout del repositorio
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # 2. Sincronizar Archivos con el Servidor
       - name: Sync Files to Server
         run: |
           rsync -av --exclude=".git" $GITHUB_WORKSPACE/ /home/cantalupe/src/whatzilla-back/
 
-      # 3. Build and Deploy Docker Containers
       - name: Deploy Containers with Docker Compose
         run: |
           cd /home/cantalupe/src/whatzilla-back
@@ -27,7 +24,6 @@ jobs:
           docker compose pull
           docker compose up -d --build
 
-      # 4. Verificar los Logs de la Aplicación (opcional)
       - name: View Application Logs
         run: |
           docker logs whatzilla-back
