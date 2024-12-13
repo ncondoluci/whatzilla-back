@@ -3,7 +3,7 @@ import { createClient } from 'redis';
 const redisClient = createClient({
   socket: {
     host: '127.0.0.1',
-    port: 'redis',
+    port: '3366',
   }
 });
 
