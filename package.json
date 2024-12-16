@@ -5,7 +5,6 @@
   "scripts": {
     "build": "tsc",
     "start": "node -r ./register-paths.js dist/app.js",
-    // "start": "node -r tsconfig-paths/register -r ./register-paths.js dist/app.js"
     "dev": "ts-node-dev --respawn --transpile-only ./app.ts"
   },
   "author": "Nicolás Condoluci",
