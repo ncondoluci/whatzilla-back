@@ -2,19 +2,18 @@ FROM node:20.15
 
 WORKDIR /app
 
-# Copia y configura dependencias
+# Copiar archivos clave
 COPY package*.json tsconfig.json ./
+
+# Instalar dependencias
 RUN npm install
 
-# Copia todo el proyecto
+# Copiar el resto del código
 COPY . .
 
-# Compila el proyecto
-RUN npm run build
+# Compilar TypeScript
+RUN npx tsc
 
-# Verifica el contenido de /app
-RUN ls -l /app
-
-# Exponer el puerto y comando de inicio
 EXPOSE 3000
+
 CMD ["npm", "start"]
