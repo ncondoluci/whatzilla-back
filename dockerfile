@@ -1,22 +1,23 @@
+# Imagen base
 FROM node:20.15
 
-# Establece el directorio de trabajo
+# Directorio de trabajo
 WORKDIR /app
 
-# Copia archivos clave para instalar dependencias
+# Copia archivos de configuración
 COPY package*.json tsconfig.json ./
 
-# Instala dependencias
-RUN npm install
+# Instala solo dependencias necesarias en producción
+RUN npm install --production
 
-# Copia todo el código fuente al contenedor
+# Copia todo el código fuente
 COPY . .
 
-# Compila TypeScript usando tsconfig-paths para resolver alias
-RUN npx tsc -p tsconfig.json
+# Compila TypeScript
+RUN npx tsc
 
-# Expone el puerto de la aplicación
+# Exponer puerto
 EXPOSE 3000
 
-# Comando para iniciar la aplicación compilada
-CMD ["npm", "start"]
+# Ejecutar aplicación compilada
+CMD ["node", "dist/app.js"]
