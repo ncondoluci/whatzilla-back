@@ -12,12 +12,3 @@ RUN npm install --production
 
 # Copia todo el código fuente
 COPY . .
-
-# Compila TypeScript
-RUN npx tsc
-
-# Exponer puerto
-EXPOSE 3000
-
-# Ejecutar aplicación compilada
-CMD ["node", "dist/app.js"]
