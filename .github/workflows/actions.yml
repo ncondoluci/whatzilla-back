@@ -13,16 +13,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Clean Previous Docker Setup
+        run: |
+          # Elimina contenedores y volúmenes antiguos
+          docker compose down --volumes || true
+          docker system prune --all --volumes --force
+          docker rmi $(docker images -q) || true
+
       - name: Sync Files to Server
         run: |
-          rsync -av --exclude=".git" $GITHUB_WORKSPACE/ /home/cantalupe/src/whatzilla-back/
+          rsync -av --delete --exclude=".git" $GITHUB_WORKSPACE/ /home/cantalupe/src/whatzilla-back/
 
       - name: Deploy Containers with Docker Compose
         run: |
           cd /home/cantalupe/src/whatzilla-back
-          docker compose down || true
-          docker compose pull
-          docker compose up -d --build
+          docker compose up -d --build --no-cache
 
       - name: View Application Logs
         run: |
