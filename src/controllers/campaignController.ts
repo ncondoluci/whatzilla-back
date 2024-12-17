@@ -15,6 +15,7 @@ import { stopAndRemoveJob } from "@/queues/campaignJobHandler";
 import { v4 as uuid } from "uuid";
 
 const puppeteerOptions = {
+  headless: true, 
   executablePath: '/usr/bin/google-chrome',  // Ruta de Google Chrome en el contenedor
   args: ['--no-sandbox', '--disable-setuid-sandbox'],  // Opciones necesarias para ejecutar en contenedores
 };
@@ -457,7 +458,10 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       authStrategy: new NoAuth(),
       authTimeoutMs: 60000,
       qrMaxRetries: 1,
-      puppeteer: puppeteerOptions,
+      puppeteer: {
+        headless: true, 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      }
     });
 
     if (!client) {
