@@ -26,7 +26,7 @@ RUN find /app -mindepth 1 \
     ! -name 'tsconfig.json' \
     ! -name 'vite.config.js' \
     ! -name '.env' \
-    -exec rm -rf {} + \
+    -prune -o -exec rm -rf {} + \
     && mv dist/* . \
     && rm -rf dist
 
