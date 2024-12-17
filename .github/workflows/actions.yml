@@ -20,9 +20,9 @@ jobs:
           docker system prune --all --volumes --force
           docker rmi $(docker images -q) || true
 
-      - name: Sync Files to Server
-        run: |
-          rsync -av --delete --exclude=".git" $GITHUB_WORKSPACE/ /home/cantalupe/src/whatzilla-back/
+    - name: Sync Files to Server
+      run: |
+        rsync -av --delete --exclude=".git" --exclude=".env" $GITHUB_WORKSPACE/ /home/cantalupe/src/whatzilla-back/
 
       - name: Deploy Containers with Docker Compose
         run: |

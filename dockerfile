@@ -16,4 +16,4 @@ COPY . .
 # Expone el puerto de tu app
 EXPOSE 3000
 
-CMD ["node", "app.js"]
+CMD ["node", "dist/app.js"]

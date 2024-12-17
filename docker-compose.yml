@@ -1,50 +1,31 @@
-version: "3.8"
+version: '3.8' # Puedes eliminar la versión si quieres evitar la advertencia
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: dockerfile
-    container_name: whatzilla-back
-    restart: always
+  whatzilla-back:
+    build: .
     ports:
-      - "8080:3000"
-    volumes: 
-      - ./.env:/app/.env
+      - "3000:3000"
+    volumes:
+      - ./.env:/app/.env # Monta el archivo .env en el contenedor
     environment:
-      NODE_ENV: production
-      MYSQL_HOST: mysql
-      MYSQL_USER: root
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      REDIS_HOST: ${REDIS_HOST}
+      - NODE_ENV=production
     depends_on:
       - mysql
       - redis
+    env_file:
+      - .env # Carga las variables de entorno desde el archivo .env
 
   mysql:
     image: mysql:8.0
-    container_name: mysql
-    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
+      - MYSQL_ROOT_PASSWORD=superpassword
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=whatzilla
+      - MYSQL_PASSWORD=${DB_PASSWORD}
     ports:
       - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
 
   redis:
     image: redis:latest
-    container_name: redis
-    restart: always
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local
