@@ -2,27 +2,25 @@ version: "3.8"
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: dockerfile
-    container_name: whatzilla-back
-    restart: always
-    ports:
-      - "8080:3000"
-    volumes: 
-      - ./.env:/app/.env
-    environment:
-      NODE_ENV: production
-      MYSQL_HOST: mysql
-      MYSQL_USER: root
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      REDIS_HOST: ${REDIS_HOST}
-    depends_on:
-      - mysql
-      - redis
-    env_file:
-      - .env 
+  build:
+    context: .
+    dockerfile: dockerfile
+  container_name: whatzilla-back
+  restart: always
+  ports:
+    - "8080:3000"
+  environment:
+    NODE_ENV: production
+    MYSQL_HOST: mysql
+    MYSQL_USER: root
+    MYSQL_PASSWORD: ${DB_PASSWORD}
+    MYSQL_DATABASE: ${DB_NAME}
+    REDIS_HOST: ${REDIS_HOST}
+  depends_on:
+    - mysql
+    - redis
+  env_file:
+    - .env
 
   mysql:
     image: mysql:8.0
