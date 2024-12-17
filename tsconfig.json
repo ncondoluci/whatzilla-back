@@ -2,16 +2,17 @@
   "compilerOptions": {
     "target": "ES6",
     "module": "commonjs",
-    "rootDir": "./src",     // Apunta específicamente a "src"
-    "outDir": "./dist",     // Salida directa en "dist"
-    "baseUrl": ".",         // Base para alias
-    "paths": {
-      "@/*": ["src/*"]      // Alias para "src/*"
-    },
+    "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "strict": true
+    "typeRoots": ["node_modules/@types"],
+    "outDir": "./dist",
+    "rootDir": "./src",     // Define la carpeta fuente como "src"
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["src/**/*.ts", "app.ts"],
+  "include": ["src/**/*.ts", "app.ts"],   
   "exclude": ["node_modules", "dist", "test"]
 }
