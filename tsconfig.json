@@ -2,17 +2,16 @@
   "compilerOptions": {
     "target": "ES6",
     "module": "commonjs",
-    "strict": true,
+    "rootDir": "./src",     // Apunta específicamente a "src"
+    "outDir": "./dist",     // Salida directa en "dist"
+    "baseUrl": ".",         // Base para alias
+    "paths": {
+      "@/*": ["src/*"]      // Alias para "src/*"
+    },
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "typeRoots": ["node_modules/@types"],
-    "outDir": "./dist",
-    "rootDir": ".",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "strict": true
   },
-  "include": ["src/**/*.ts", "app.ts"],   
+  "include": ["src/**/*.ts", "app.ts"],
   "exclude": ["node_modules", "dist", "test"]
 }
