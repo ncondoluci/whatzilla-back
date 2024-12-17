@@ -17,8 +17,10 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
       REDIS_HOST: ${REDIS_HOST}
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
 
