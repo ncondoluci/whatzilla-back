@@ -1,28 +1,6 @@
-# Node dependencies locales
 node_modules
-
-# Compilación local
-dist
-
-# Archivos TypeScript (solo necesitas el código JS compilado en producción)
-*.ts
-
-# Configuraciones de desarrollo
-.env
-*.log
-.vscode/
-.idea/
-.prettierrc
-.sequelizerc
-vite.config.js
-
-# Control de versiones
+npm-debug.log
+Dockerfile
+.dockerignore
 .git
 .gitignore
-
-# Archivos de documentación
-*.md
-
-# Archivos temporales del sistema operativo
-.DS_Store
-Thumbs.db
