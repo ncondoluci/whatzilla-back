@@ -1,5 +1,5 @@
 # Imagen base
-FROM node:20.15
+FROM puppeteer/puppeteer:latest
 
 # Directorio de trabajo
 WORKDIR /app
