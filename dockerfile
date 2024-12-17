@@ -1,11 +1,11 @@
 # Imagen base
 FROM node:20.15
 
-# Directorio de trabajo
+# Directorio de trabajo inicial
 WORKDIR /app
 
 # Copia dependencias y archivos de configuración
-COPY package*.json tsconfig.json vite.config.js .env register-paths.js ./
+COPY package*.json tsconfig.json ./
 
 # Instala dependencias
 RUN npm install
@@ -16,19 +16,8 @@ COPY . .
 # Compila el código TypeScript
 RUN npm run build
 
-# Limpia archivos innecesarios y mueve el contenido de dist
-RUN find /app -mindepth 1 \
-    ! -name 'dist' \
-    ! -name 'package.json' \
-    ! -name 'package-lock.json' \
-    ! -name 'node_modules' \
-    ! -name 'register-paths.js' \
-    ! -name 'tsconfig.json' \
-    ! -name 'vite.config.js' \
-    ! -name '.env' \
-    -prune -o -exec rm -rf {} + \
-    && mv dist/* . \
-    && rm -rf dist
+# Cambia el directorio de trabajo a dist
+WORKDIR /app/dist
 
-# Comando para iniciar la aplicación
-CMD ["npm", "run", "start"]
+# Comando para iniciar la aplicación (reutiliza el script start)
+CMD ["npm", "run", "start", "--prefix", "/app"]
