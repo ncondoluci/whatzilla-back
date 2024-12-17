@@ -14,6 +14,11 @@ import { userState } from'@/sockets/socketManager';
 import { stopAndRemoveJob } from "@/queues/campaignJobHandler";
 import { v4 as uuid } from "uuid";
 
+const puppeteerOptions = {
+  executablePath: '/usr/bin/google-chrome',  // Ruta de Google Chrome en el contenedor
+  args: ['--no-sandbox', '--disable-setuid-sandbox'],  // Opciones necesarias para ejecutar en contenedores
+};
+
 export const postCampaign = async (req: Request, res: Response, next: NextFunction) => {
   const { uid: user_id } = req.user as { uid: string };
   const { name } = req.body;
@@ -247,10 +252,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
       authStrategy: new NoAuth(),
       authTimeoutMs: 60000,
       qrMaxRetries: 1,
-      puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      }
+      puppeteer: puppeteerOptions,
     });
 
     if (!client) {
@@ -455,10 +457,7 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       authStrategy: new NoAuth(),
       authTimeoutMs: 60000,
       qrMaxRetries: 1,
-      puppeteer: {
-        headless: true, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      }
+      puppeteer: puppeteerOptions,
     });
 
     if (!client) {
