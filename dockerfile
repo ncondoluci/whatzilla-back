@@ -20,4 +20,5 @@ RUN npm run build
 EXPOSE 3000
 
 # Comando de inicio
-CMD ["node", "dist/app.js"]
+CMD ["node", "-r", "tsconfig-paths/register", "dist/app.js"]
+
