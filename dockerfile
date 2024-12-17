@@ -5,7 +5,7 @@ FROM node:20.15
 WORKDIR /app
 
 # Copia dependencias y archivos de configuración
-COPY package*.json tsconfig.json vite.config.js .env register-path.js ./
+COPY package*.json tsconfig.json vite.config.js .env register-paths.js ./
 
 # Instala dependencias
 RUN npm install
@@ -20,8 +20,9 @@ RUN npm run build
 RUN find /app -mindepth 1 \
     ! -name 'dist' \
     ! -name 'package.json' \
+    ! -name 'package-lock.json' \
     ! -name 'node_modules' \
-    ! -name 'register-path.js' \
+    ! -name 'register-paths.js' \
     ! -name 'tsconfig.json' \
     ! -name 'vite.config.js' \
     ! -name '.env' \
