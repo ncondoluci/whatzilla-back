@@ -8,7 +8,7 @@ services:
     container_name: whatzilla-back
     restart: no
     ports:
-      - "3000:3000"  # Corregido
+      - "3000:3000"  # Puerto de la app
     environment:
       NODE_ENV: production
       MYSQL_HOST: mysql
@@ -29,12 +29,14 @@ services:
     container_name: mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}  # Contraseña del root
+      MYSQL_DATABASE: ${DB_NAME}               # Base de datos por defecto
+      MYSQL_USER: ${DB_USER}                   # Usuario adicional
+      MYSQL_PASSWORD: ${DB_PASSWORD}           # Contraseña del usuario adicional
     ports:
-      - "3306:3306"
+      - "3306:3306"                            # Puerto MySQL
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql              # Persistencia de datos
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -46,15 +48,14 @@ services:
     container_name: redis
     restart: always
     ports:
-      - "6379:6379"
+      - "6379:6379"                            # Puerto Redis
     volumes:
-      - redis_data:/data
+      - redis_data:/data                       # Persistencia de Redis
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
-
 
 volumes:
   mysql_data:
