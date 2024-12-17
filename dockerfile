@@ -12,6 +12,7 @@ RUN npm install
 
 # Instalamos Google Chrome y las dependencias necesarias
 RUN apt-get update && apt-get install -y \
+  wget \
   curl \
   gnupg \
   libxss1 \
@@ -29,8 +30,20 @@ RUN apt-get update && apt-get install -y \
   libxrandr2 \
   libpango-1.0-0 \
   libgtk-3-0 \
-  google-chrome-stable --no-install-recommends \
-  && rm -rf /var/lib/apt/lists/*
+  ca-certificates \
+  --no-install-recommends
+
+# Añadimos el repositorio de Google Chrome y la clave GPG
+RUN curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+  sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
+
+# Actualizamos la lista de paquetes e instalamos Google Chrome
+RUN apt-get update && apt-get install -y google-chrome-stable --no-install-recommends
+
+# Limpiar la caché para reducir el tamaño de la imagen
+RUN rm -rf /var/lib/apt/lists/*
+
+# Continúa con el resto de tu Dockerfile...
 
 # Copia el código fuente
 COPY . .
