@@ -8,9 +8,11 @@ on:
 jobs:
   deploy:
     runs-on: [self-hosted, backend]
-      steps:
-        - name: Checkout Repository
-          uses: actions/checkout@v3
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
       - name: Clean Previous Docker Setup
         run: |
           cd /home/cantalupe/src/whatzilla-back
@@ -26,6 +28,6 @@ jobs:
           cd /home/cantalupe/src/whatzilla-back
           docker compose up -d --build
 
-        - name: View Application Logs
+      - name: View Application Logs
         run: |
           docker logs whatzilla-back
