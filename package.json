@@ -7,7 +7,7 @@
   "description": "",
   "scripts": {
   "build": "tsc",
-  "start": "node -r tsconfig-paths/register app.js",
+  "start": "node -r tsconfig-paths/register dist/app.js",
   "dev": "ts-node-dev --respawn --transpile-only ./app.ts"
   },
   "dependencies": {
