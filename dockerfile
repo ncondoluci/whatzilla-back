@@ -4,19 +4,20 @@ FROM node:20.15
 # Directorio de trabajo
 WORKDIR /app
 
-# Copia archivos de configuración
+# Copia archivos necesarios para instalar dependencias
 COPY package*.json tsconfig.json ./
 
-# Instala solo dependencias necesarias en producción
+# Instala las dependencias
 RUN npm install
+
+# Copia todo el código fuente ANTES de compilar
+COPY . .
 
 # Compila el código TypeScript
 RUN npm run build
 
-# Copia todo el código fuente
-COPY . .
-
-# Expone el puerto de tu app
+# Expone el puerto de la aplicación
 EXPOSE 3000
 
+# Comando de inicio
 CMD ["node", "dist/app.js"]
