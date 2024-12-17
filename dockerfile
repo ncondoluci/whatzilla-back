@@ -12,3 +12,8 @@ RUN npm install --production
 
 # Copia todo el código fuente
 COPY . .
+
+# Expone el puerto de tu app
+EXPOSE 3000
+
+CMD ["node", "app.js"]

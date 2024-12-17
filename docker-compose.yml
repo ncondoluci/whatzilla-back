@@ -9,6 +9,8 @@ services:
     restart: always
     ports:
       - "8080:3000"
+    volumes: 
+      - ./.env:/app/.env
     environment:
       NODE_ENV: production
       MYSQL_HOST: mysql
@@ -46,4 +48,3 @@ volumes:
     driver: local
   redis_data:
     driver: local
-# some change
