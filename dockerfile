@@ -8,7 +8,10 @@ WORKDIR /app
 COPY package*.json tsconfig.json ./
 
 # Instala solo dependencias necesarias en producción
-RUN npm install --production
+RUN npm install
+
+# Compila el código TypeScript
+RUN npm run build
 
 # Copia todo el código fuente
 COPY . .
