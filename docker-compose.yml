@@ -8,7 +8,7 @@ services:
     container_name: whatzilla-back
     restart: no
     ports:
-      - "8080:3000"  # Corregido
+      - "3000:3000"  # Corregido
     environment:
       NODE_ENV: production
       MYSQL_HOST: mysql
