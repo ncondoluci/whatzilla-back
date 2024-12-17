@@ -7,8 +7,8 @@ if(process.env.NODE_ENV === 'production') {
 
 const redisClient = createClient({
   socket: {
-    host: '127.0.0.1',
-    port: redisHost,
+    host: process.env.REDIS_HOST || 'localhost',
+    port: Number(process.env.REDIS_PORT) || 6379
   }
 });
 
