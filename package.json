@@ -2,11 +2,6 @@
   "name": "whatzilla-back",
   "version": "1.0.0",
   "main": "app.ts",
-  "scripts": {
-    "build": "tsc",
-    "start": "node -r tsconfig-paths/register dist/app.js",
-    "dev": "ts-node-dev --respawn --transpile-only ./app.ts"
-  },
   "author": "Nicolás Condoluci",
   "license": "ISC",
   "description": "",

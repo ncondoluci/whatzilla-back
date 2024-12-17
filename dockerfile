@@ -16,5 +16,12 @@ COPY . .
 # Compila el código TypeScript
 RUN npm run build
 
+# Copia la carpeta uploads a dist/uploads
+RUN mkdir -p ./dist/uploads && cp -r ./src/uploads/* ./dist/uploads/ || true
+
+# Configurar el usuario node para seguridad
+RUN chown -R node:node /app
+USER node
+
 # Comando para iniciar la aplicación
 CMD ["npm", "run", "start"]
