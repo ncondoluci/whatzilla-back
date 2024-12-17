@@ -54,7 +54,7 @@ class CampaignProvider {
 
             const uniqueFileId = uuidv4();
             const fileExtension = path.extname(file.name);
-            const userDir = path.resolve(process.cwd(), 'dist','src', 'uploads', `${year}`, `${month}`, `${day}`, this.user_id);
+            const userDir = path.resolve(process.cwd(), 'src', 'uploads', `${year}`, `${month}`, `${day}`, this.user_id);
 
             // Verificar si el directorio existe
             try {
@@ -103,7 +103,7 @@ class CampaignProvider {
             const userId = campaign.user_id;
             const filePath = path.join(
                 process.cwd(),
-                `/dist/src/uploads/${year}/${month}/${day}/${userId}/${campaignId}.xlsx`
+                `/src/uploads/${year}/${month}/${day}/${userId}/${campaignId}.xlsx`
             );
 
             const fileBuffer = await fs.readFile(filePath);
