@@ -465,10 +465,10 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-        ],
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+          '--disable-features=UseDBus'
+      ],
       }
     });
 
