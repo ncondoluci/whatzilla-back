@@ -20,7 +20,7 @@ export const getCampaignReport = async (req: Request, res: Response, next: NextF
         return sendResponse(res, 200, {
             success: true,
             message: 'Report found',
-            report
+            data: report
         });
     } catch (error) {
         next(new AppError({message: "Error getting campaign report.", statusCode: 500, isOperational: false, data: error}));
