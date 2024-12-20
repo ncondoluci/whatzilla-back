@@ -245,7 +245,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
         puppeteer: {
           headless: true,
           dumpio: true, 
-          executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : undefined,
+          executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : undefined,
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -460,7 +460,7 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       puppeteer: {
         headless: true,
         dumpio: true, 
-        executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : undefined,
+        executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
