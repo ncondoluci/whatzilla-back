@@ -244,6 +244,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
         qrMaxRetries: 1,
         puppeteer: {
           headless: true, 
+          executablePath: '/usr/bin/google-chrome',
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
         }
       });
@@ -449,6 +450,7 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       qrMaxRetries: 1,
       puppeteer: {
         headless: true, 
+        executablePath: '/usr/bin/google-chrome',
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       }
     });
