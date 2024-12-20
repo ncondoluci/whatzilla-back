@@ -20,7 +20,7 @@ export const getCampaignReport = async (req: Request, res: Response, next: NextF
         return sendResponse(res, 200, {
             success: true,
             message: 'Report found',
-            data: report
+            report
         });
     } catch (error) {
         next(new AppError({message: "Error getting campaign report.", statusCode: 500, isOperational: false, data: error}));
@@ -29,7 +29,6 @@ export const getCampaignReport = async (req: Request, res: Response, next: NextF
 
 export const getCampaignReports = async (req: Request, res: Response, next: NextFunction) => {
     const { uid: campaignId} = req.params;
-    logger.info(campaignId)
 
     try {
         const reports = await CampaignReport.findAll({ where: { campaign_id: campaignId } });
