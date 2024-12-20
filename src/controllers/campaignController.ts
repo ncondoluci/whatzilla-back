@@ -237,15 +237,23 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
           message: 'Error loading campaign data || Campaign data not found.'
         });
       }
-      
+
       const client = new Client({
         authStrategy: new NoAuth(),
         authTimeoutMs: 120000,
         qrMaxRetries: 1,
         puppeteer: {
-          headless: true, 
-          executablePath: '/usr/bin/google-chrome',
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          headless: true,
+          dumpio: true, 
+          executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : undefined,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+          ],
         }
       });
 
@@ -449,9 +457,17 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
       authTimeoutMs: 60000,
       qrMaxRetries: 1,
       puppeteer: {
-        headless: true, 
-        executablePath: '/usr/bin/google-chrome',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: true,
+        dumpio: true, 
+        executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : undefined,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+        ],
       }
     });
 
