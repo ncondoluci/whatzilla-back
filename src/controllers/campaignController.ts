@@ -240,7 +240,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
       
       const client = new Client({
         authStrategy: new NoAuth(),
-        authTimeoutMs: 60000,
+        authTimeoutMs: 120000,
         qrMaxRetries: 1,
         puppeteer: {
           headless: true, 
