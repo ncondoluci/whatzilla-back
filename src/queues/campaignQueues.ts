@@ -9,7 +9,7 @@ import { Client } from 'whatsapp-web.js';
 
 export const jobQueue = new Queue('jobQueue', {
   redis: {
-    host: 'redis',
+    host: 'localhost',
     port: 6379,
   },
   defaultJobOptions: {
