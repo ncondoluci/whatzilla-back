@@ -363,6 +363,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
       await client.initialize();
 
   } catch (error) {
+    logger.error('Error during client initialization:', { error });
     next(new AppError({ message: "An error occurred while initializing campaign.", statusCode: 500, isOperational: false, data: error }));
   }
 };
