@@ -239,22 +239,14 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
       }
 
       const client = new Client({
-        authStrategy: new NoAuth(),
-        authTimeoutMs: 120000,
-        qrMaxRetries: 1,
         puppeteer: {
-          headless: true,
-          dumpio: true, 
-          executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : undefined,
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
+            '--disable-blink-features=PermissionsPolicy', // Deshabilita las políticas no reconocidas
+            '--disable-blink-features=InterestCohort',   // Deshabilita InterestCohort
           ],
-        }
+        },
       });
 
       if (!client) {
