@@ -133,12 +133,12 @@ const removeCampaignData = async ( campaignReport: any, reportId: any, campaign_
 }
 
 jobQueue.process(10, async (job, done) => {
-  const { dataArray, totalMessages, startFrom = 0, campaign_id, user_id, sessionId } = job.data;
+  const { dataArray, totalMessages, startFrom = 0, campaign_id, user_id, sessionId, socketId } = job.data;
   let { reportId = ''} = job.data;
   
   const user = userState.get(user_id);
   const client = user[`session_${sessionId}`];
-  const socketId = user.socketId;
+
 
   try {
     // Generate campaign report in DDBB

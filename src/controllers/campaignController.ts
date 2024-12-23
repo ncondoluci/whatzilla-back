@@ -289,7 +289,7 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
           [`session_${sessionId}`]: client
         });
         
-        await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id, sessionId });
+        await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id, sessionId, socketId });
 
         // Notify frontend
         io.to(socketId).emit('whatsApp', {
@@ -456,10 +456,6 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-software-rasterizer',
-          '--disable-features=UseDBus'
       ],
       }
     });
@@ -510,6 +506,7 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
         reportId: lastReportId,
         user_id: userId,
         sessionId,
+        socketId,
         dataArray: messagesToSend,
         totalMessages,
         startFrom,
