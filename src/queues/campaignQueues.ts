@@ -120,14 +120,14 @@ const removeCampaignData = async ( campaignReport: any, reportId: any, campaign_
   } catch (error) {
     if (error instanceof Error) {
       
-      logger.error(`Error marking job ${job.id} as completed: ${error.message}`, {
+      logger.error(`Error marking job ${jobId} as completed: ${error.message}`, {
         jobId,
         campaign_id,
         data: error,
       });
 
     } else {
-      logger.error(`Unknow error happened while handling failure on job ${job.id}`);
+      logger.error(`Unknow error happened while handling failure on job ${jobId}`);
     }
   }
 }
