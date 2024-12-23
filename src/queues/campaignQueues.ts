@@ -80,6 +80,58 @@ const redisStatsInitializer = async (campaignKey: string) => {
   });
 }
 
+const removeCampaignData = async ( campaignReport: any, reportId: any, campaign_id: any, totalMessages: any, user: any, client: any, sessionId: any, user_id: any, socketId: any, jobId: any) => {
+  try {
+    await campaignReport.update({ status: 'sent', sent_percent: 100 });
+
+    const withError: number = Number(await redisClient.hGet(`campaign_${campaign_id}`, 'errors')) ?? 0;
+    const sent_percent: number = 100 - withError;
+    // Save progress in Report
+    await CampaignReport.update(
+      { status: 'sent', processed: totalMessages, with_error: withError, sent_percent },
+      { where: { uid: reportId } }
+    );
+
+    // Save status in Campaign data
+    await Campaign.update({ sent_at: new Date(), status: 'active' }, { where: { uid: campaign_id } });
+
+    // Remove redis state
+    await redisClient.del(`campaign_${campaign_id}`);
+
+    // Delete What's App client and session 
+    await client.logout();
+    await client.destroy();
+
+    // Delete session data from client Singleton instance
+    if (user) {
+      delete user[`session_${sessionId}`];
+      userState.set(user_id, user);
+    }
+
+    // Notify the front
+    if (io) {
+      io.to(socketId).emit('campaign', {
+        event: 'completed',
+        capaignId: campaign_id,
+      });
+    }
+
+    logger.info(`Job ${jobId} completed successfully.`);
+  } catch (error) {
+    if (error instanceof Error) {
+      
+      logger.error(`Error marking job ${job.id} as completed: ${error.message}`, {
+        jobId,
+        campaign_id,
+        data: error,
+      });
+
+    } else {
+      logger.error(`Unknow error happened while handling failure on job ${job.id}`);
+    }
+  }
+}
+
 jobQueue.process(10, async (job, done) => {
   const { dataArray, totalMessages, startFrom = 0, campaign_id, user_id, sessionId } = job.data;
   let { reportId = ''} = job.data;
@@ -135,7 +187,7 @@ jobQueue.process(10, async (job, done) => {
         
         if (campaignStatus === 'stopped' || exitJob === 'true') {
           logger.info(`Campaign ${campaign_id} has been ${campaignStatus}. Ending job.`);
-
+          await removeCampaignData(campaignReport, reportId,campaign_id, totalMessages, user, client, sessionId, user_id, socketId, job.id);
           return done(new Error('Paused: The campaign was stopped intentionally.'), messagesProcessed);
         }
 
@@ -213,61 +265,11 @@ jobQueue.process(10, async (job, done) => {
       }
     }
 
+    await removeCampaignData(campaignReport, reportId,campaign_id, totalMessages, user, client, sessionId, user_id, socketId, job.id);
     
-    try {
-      await campaignReport.update({ status: 'sent', sent_percent: 100 });
-
-      const withError: number = Number(await redisClient.hGet(`campaign_${campaign_id}`, 'errors')) ?? 0;
-      const sent_percent: number = 100 - withError;
-      // Save progress in Report
-      await CampaignReport.update(
-        { status: 'sent', processed: totalMessages, with_error: withError, sent_percent },
-        { where: { uid: reportId } }
-      );
-  
-      // Save status in Campaign data
-      await Campaign.update({ sent_at: new Date(), status: 'active' }, { where: { uid: campaign_id } });
-  
-      // Remove redis state
-      await redisClient.del(`campaign_${campaign_id}`);
-  
-      // Delete What's App client and session 
-      await client.logout();
-      await client.destroy();
-  
-      // Delete session data from client Singleton instance
-      if (user) {
-        delete user[`session_${sessionId}`];
-        userState.set(user_id, user);
-      }
-  
-      // Notify the front
-      if (io) {
-        io.to(socketId).emit('campaign', {
-          event: 'completed',
-          capaignId: campaign_id,
-        });
-      }
-  
-      logger.info(`Job ${job.id} completed successfully.`);
-    } catch (error) {
-      if (error instanceof Error) {
-        
-        logger.error(`Error marking job ${job.id} as completed: ${error.message}`, {
-          jobId: job.id,
-          campaign_id,
-          data: error,
-        });
-  
-      } else {
-        logger.error(`Unknow error happened while handling failure on job ${job.id}`);
-      }
-    }
-
     done(null);
-
   } catch (error) {
-    
+  
     if (error instanceof Error) {
       logger.error(`Error al procesar la campaña ${campaign_id}: ${error.message}`);
       done(new Error(`Error al procesar la campaña ${campaign_id}: ${error.message}`));
@@ -277,7 +279,7 @@ jobQueue.process(10, async (job, done) => {
       logger.error(`Error desconocido al procesar la campaña ${campaign_id}`);
       done(new Error(`Error desconocido al procesar la campaña ${campaign_id}`));
     }
-
+  
   }
 });
 
