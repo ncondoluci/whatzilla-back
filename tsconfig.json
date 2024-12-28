@@ -6,13 +6,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "typeRoots": ["node_modules/@types"],
-    "rootDir": ".",         // La raíz del proyecto
-    "outDir": "./dist",     // Carpeta de salida
-    "baseUrl": ".",         // Base para los alias
+    "rootDir": ".",
+    "outDir": "./dist",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]      // Alias para los archivos dentro de src
+      "@/*": ["src/*"]
     },
   },
-  "include": ["src/**/*.ts", "app.ts"],   
+"include": ["src/**/*.ts", "app.ts"],
   "exclude": ["node_modules", "dist", "test"]
 }

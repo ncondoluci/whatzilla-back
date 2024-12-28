@@ -446,18 +446,14 @@ export const resumeCampaign = async (req: Request, res: Response, next: NextFunc
     // Create what's app client
     let isAuthenticated: Boolean = false;
     const client = new Client({
-      authStrategy: new NoAuth(),
-      authTimeoutMs: 60000,
-      qrMaxRetries: 1,
       puppeteer: {
-        headless: true,
-        dumpio: true, 
-        executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : undefined,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
-      ],
-      }
+          '--disable-blink-features=PermissionsPolicy', // Deshabilita las políticas no reconocidas
+          '--disable-blink-features=InterestCohort',   // Deshabilita InterestCohort
+        ],
+      },
     });
 
     if (!client) {
