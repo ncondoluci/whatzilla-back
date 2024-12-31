@@ -81,6 +81,7 @@ const redisStatsInitializer = async (campaignKey: string) => {
 }
 
 const removeCampaignDataOnComplete = async ( campaignReport: any, reportId: any, campaign_id: any, totalMessages: any, user: any, client: any, sessionId: any, user_id: any, socketId: any, jobId: any) => {
+  console.log(`Entrando a removeCampaingOnComplete`);
   try {
     await campaignReport.update({ status: 'sent', sent_percent: 100 });
 
@@ -163,15 +164,15 @@ const removeCampaignDataOnStop = async ( campaignReport: any, reportId: any, cam
 
     // Remove redis state
     await redisClient.del(`campaign_${campaign_id}`);
-    
+
     // Delete What's App client and session 
     await client.logout();
     await client.destroy();
-    
+
     // Delete session data from client Singleton instance
     if (user && user[`session_${sessionId}`]) {
-      delete user[`session_${sessionId}`];
-      userState.set(user_id, user);
+    delete user[`session_${sessionId}`];
+    userState.set(user_id, user);
     }
     
     logger.error(`Job ${jobId} failed with error.`, {
@@ -253,7 +254,7 @@ jobQueue.process(10, async (job, done) => {
         await client.sendMessage(recipientNumber, item.MENSAJE)
           .then(() => {
             logger.info(`Message sent to ${recipientNumber}`);
-            
+            console.log(socketId)
             io.to(socketId).emit('campaign', {
               event: 'sendMessage',
               campaignId: campaign_id ,
