@@ -4,7 +4,8 @@ import { sendResponse } from "@/utils/customResponse";
 import { Request, Response, NextFunction } from "express";
 
 export const postList = async ( req: Request, res: Response, next: NextFunction ) => {
-    const { name, user_id } = req.body;
+    const { uid: user_id } = req.user as { uid: string };
+    const { name } = req.body;
 
     try {
         const list = await List.create({ name, user_id });
