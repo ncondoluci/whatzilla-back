@@ -10,9 +10,6 @@ router.post('/', [
     body('name')
         .not().isEmpty().withMessage('List name must not be empty.')
         .isString().withMessage('List name must be a string.'),
-    body('user_id')
-        .not().isEmpty().withMessage('User UID must not be empty.')
-        .isString().withMessage('Invalid formar for user_id'),
     validationMiddleware
 ], postList);
 
