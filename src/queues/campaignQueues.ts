@@ -69,6 +69,7 @@ const registerMessageAck = (client: Client, campaignId: string) => {
       }
     });
 }
+
 const redisStatsInitializer = async (campaignKey: string) => {
   await redisClient.hSet(campaignKey, {
     status: 'running',
@@ -81,7 +82,6 @@ const redisStatsInitializer = async (campaignKey: string) => {
 }
 
 const removeCampaignDataOnComplete = async ( campaignReport: any, reportId: any, campaign_id: any, totalMessages: any, user: any, client: any, sessionId: any, user_id: any, socketId: any, jobId: any) => {
-  console.log(`Entrando a removeCampaingOnComplete`);
   try {
     await campaignReport.update({ status: 'sent', sent_percent: 100 });
 
