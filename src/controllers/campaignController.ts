@@ -226,133 +226,87 @@ export const startCampaign = async (req: Request, res: Response, next: NextFunct
       });
     }
 
+    // Procession the data form a campa ign file (xlsx)
+    const campaignProvider = new CampaignProvider(user_id);
+    const campaignData = await campaignProvider.getCampaignData(campaign_id);
+    const totalMessages = campaignData.length;
+    if(!campaignData || !totalMessages) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error loading campaign data || Campaign data not found.'
+      });
+    }
+
+    const client = new Client({
+      puppeteer: {
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=PermissionsPolicy',
+          '--disable-blink-features=InterestCohort',
+        ],
+      },
+    });
+
+    if (!client) {
+      return sendResponse(res, 200, {
+        success: false,
+        message: 'Error creating WhatsApp client.'
+      });
+    }
+
     let isAuthenticated: Boolean = false;
-      // Procession the data form a campaign file (xlsx)
-      const campaignProvider = new CampaignProvider(user_id);
-      const campaignData = await campaignProvider.getCampaignData(campaign_id);
-      const totalMessages = campaignData.length;
-      if(!campaignData || !totalMessages) {
-        return sendResponse(res, 200, {
-          success: false,
-          message: 'Error loading campaign data || Campaign data not found.'
-        });
-      }
+    client.on('qr', (qr: string) => {
+      setTimeout(async ()=> {
+        if(!isAuthenticated) {
+          logger.info('QR code was not scanned at time | What´s App authentication error.');
 
-      const client = new Client({
-        puppeteer: {
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=PermissionsPolicy', // Deshabilita las políticas no reconocidas
-            '--disable-blink-features=InterestCohort',   // Deshabilita InterestCohort
-          ],
-        },
-      });
+          await client.logout();
+          await client.destroy();
 
-      if (!client) {
-        return sendResponse(res, 200, {
-          success: false,
-          message: 'Error creating WhatsApp client.'
-        });
-      }
-
-      client.on('qr', (qr: string) => {
-        setTimeout(async ()=> {
-          if(!isAuthenticated) {
-            logger.info('QR code was not scanned at time | What´s App authentication error.');
-
-            await client.logout();
-            await client.destroy();
-
-            io.to(socketId).emit('whatsApp', {
-              event: 'disconnect',
-              campaign_id
-            });
-          }
-        }, 60000);
-
-        return sendResponse(res, 200, {
-          success: true,
-          message: "QR code generated. Please scan to authenticate.",
-          qr
-        });
-      });
-
-      client.on('ready', async () => {
-        logger.info('Job running.');
-
-        isAuthenticated = true;
-        
-        const sessionId = uuid();
-        userState.set(user_id, {
-          ...userState.get(user_id),
-          [`session_${sessionId}`]: client
-        });
-        
-        await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id, sessionId, socketId });
-
-        // Notify frontend
-        io.to(socketId).emit('whatsApp', {
-          event: 'ready',
-          campaign_id
-        });
-
-      });
-
-      // Listen to message status
-      client.on('message_ack', async (message: string, ack: number) => {
-        const campaignKey = `campaign_${campaign_id}`;
-      
-        switch (ack) {
-          case 0:
-            logger.error('ACK_ERROR: Error sending the message.');
-            const messagesWithErrors = await redisClient.hGet(campaignKey, 'errors');
-            redisClient.hSet(campaignKey, 'errors', parseInt(messagesWithErrors || '0', 10) + 1);
-            break;
-      
-          case 1:
-            // logger.info('ACK_PENDING: Message is pending.');
-            const pendingMessages = await redisClient.hGet(campaignKey, 'pending');
-            redisClient.hSet(campaignKey, 'pending', parseInt(pendingMessages || '0', 10) + 1);
-            break;
-      
-          case 2:
-            logger.info('ACK_SERVER: Message received by WhatsApp server.');
-            const serverReceived = await redisClient.hGet(campaignKey, 'received_by_server');
-            redisClient.hSet(campaignKey, 'received_by_server', parseInt(serverReceived || '0', 10) + 1);
-            break;
-      
-          case 3:
-            // logger.info('ACK_DEVICE: Message delivered to the recipient’s device.');
-            const deliveredMessages = await redisClient.hGet(campaignKey, 'delivered');
-            redisClient.hSet(campaignKey, 'delivered', parseInt(deliveredMessages || '0', 10) + 1);
-            break;
-      
-          case 4:
-            logger.info('ACK_READ: Message read by the recipient.');
-            const readMessages = await redisClient.hGet(campaignKey, 'read');
-            redisClient.hSet(campaignKey, 'read', parseInt(readMessages || '0', 10) + 1);
-            break;
-      
-          case 5:
-            logger.info('ACK_PLAYED: Audio message played by the recipient.');
-            const playedMessages = await redisClient.hGet(campaignKey, 'played');
-            redisClient.hSet(campaignKey, 'played', parseInt(playedMessages || '0', 10) + 1);
-            break;
-      
-          default:
-            logger.info('Unknown ack status:', ack);
+          io.to(socketId).emit('whatsApp', {
+            event: 'disconnect',
+            campaign_id
+          });
         }
+      }, 60000);
+
+      return sendResponse(res, 200, {
+        success: true,
+        message: "QR code generated. Please scan to authenticate.",
+        qr
+      });
+    });
+
+    client.on('ready', async () => {
+      logger.info('Job running.');
+
+      isAuthenticated = true;
+      
+      const sessionId = uuid();
+      userState.set(user_id, {
+        ...userState.get(user_id),
+        [`session_${sessionId}`]: client
+      });
+      
+      await jobQueue.add({ dataArray: campaignData, totalMessages, campaign_id, user_id, sessionId, socketId });
+
+      // Notify frontend
+      io.to(socketId).emit('whatsApp', {
+        event: 'ready',
+        campaign_id
       });
 
-      client.on('auth_failure', (error) => {
-        return sendResponse(res, 200, {
-          success: false,
-          message: "What's App authentication failed.",
-        });
-      });
+    });
 
-      await client.initialize();
+    client.on('auth_failure', (error) => {
+      return sendResponse(res, 200, {
+        success: false,
+        message: "What's App authentication failed.",
+      });
+    });
+
+    await client.initialize();
 
   } catch (error) {
     logger.error('Error during client initialization:', { error });
