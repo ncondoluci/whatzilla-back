@@ -21,6 +21,9 @@ router.post('/', [
     body('email')
         .not().isEmpty().withMessage('Subscriber´s email must not be empty.')
         .isEmail().withMessage('Subscriber´s email wrong format.'),
+    body('contact_number')
+        .not().isEmpty().withMessage('Subscriber´s email must not be empty.')
+        .isJSON().withMessage('Contact information is required.'),
     body('status')
         .optional().not().isEmpty().withMessage('Subscriber´s status must not be empty.')
         .isIn(['unsuscribed', 'confirmed', 'blacklisted']).withMessage('Subscriber´s status must be one of "unsuscribed", "confirmed", "blacklisted".'),
