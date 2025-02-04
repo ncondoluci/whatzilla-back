@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { body, param } from "express-validator";
-import { deleteList, getList, patchList, postList } from "@/controllers";
+import { deleteList, getList, getLists, patchList, postList } from "@/controllers";
 import { JWTValidator, validationMiddleware } from "@/middlewares";
 
 const router = Router();
@@ -12,6 +12,11 @@ router.post('/', [
         .isString().withMessage('List name must be a string.'),
     validationMiddleware
 ], postList);
+
+router.get('/', [
+    JWTValidator,
+    validationMiddleware
+], getLists);
 
 router.get('/:uid', [
     JWTValidator,
