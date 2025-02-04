@@ -46,6 +46,33 @@ export const getList = async (req: Request, res: Response, next: NextFunction) =
     }
 }
 
+export const getLists = async (req: Request, res: Response, next: NextFunction) => {
+    const { uid } = req.user as { uid: string };
+
+    
+    try {
+        const allData: List[] = await List.findAll({ where: { user_id: uid }, raw: true });
+        const lists = allData.map(({ id, user_id, createdAt, updatedAt, ...rest }) => rest);
+        
+        if (!lists) {
+            return sendResponse(res, 200, {
+                success: false,
+                message: 'Lists not found.',
+                list: null
+            });
+        }
+
+        return sendResponse( res, 200, {
+            success: true,
+            message: 'Lists found.',
+            lists
+        });
+
+    } catch (error) {
+        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false, data: error }));
+    }
+}
+
 export const patchList = async (req: Request, res: Response, next: NextFunction) => {
     const { uid } = req.params;
     const { name, status } = req.body;
