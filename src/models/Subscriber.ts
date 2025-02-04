@@ -53,13 +53,13 @@ Subscriber.init({
         type: DataTypes.STRING,
         allowNull: false,
     },
-    contact_number: {
+    phone_number: {
         type: DataTypes.JSON,
         allowNull: false,
     },
     email: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         validate: {
             isEmail: true,
         },

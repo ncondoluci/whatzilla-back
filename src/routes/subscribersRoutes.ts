@@ -19,11 +19,15 @@ router.post('/', [
         .not().isEmpty().withMessage('Subscriber´s last name must not be empty.')
         .isString().withMessage('Subscriber´s last name must be a string.'),
     body('email')
-        .not().isEmpty().withMessage('Subscriber´s email must not be empty.')
         .isEmail().withMessage('Subscriber´s email wrong format.'),
-    body('contact_number')
-        .not().isEmpty().withMessage('Subscriber´s email must not be empty.')
-        .isJSON().withMessage('Contact information is required.'),
+    body('phone_number')
+        .not().isEmpty().withMessage('Phone number must not be empty.'),
+    body('phone_number.cod_area')
+        .not().isEmpty().withMessage('Phone number area code must not be empty.')
+        .isString().withMessage('Phone number area code must be a string.'),
+    body('phone_number.number')
+        .not().isEmpty().withMessage('Phone number must not be empty.')
+        .isNumeric().withMessage('Phone number must be numeric.'),
     body('status')
         .optional().not().isEmpty().withMessage('Subscriber´s status must not be empty.')
         .isIn(['unsuscribed', 'confirmed', 'blacklisted']).withMessage('Subscriber´s status must be one of "unsuscribed", "confirmed", "blacklisted".'),

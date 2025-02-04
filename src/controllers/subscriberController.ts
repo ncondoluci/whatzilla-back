@@ -5,26 +5,28 @@ import { sendResponse } from "@/utils/customResponse";
 import { AppError } from "@/providers/ErrorProvider";
 
 export const postSubscriber = async ( req: Request, res: Response, next: NextFunction ) => {
-    const { first_name, last_name, email, list_id, status = 'confirmed' } = req.body;
+    const { list_id, first_name, last_name, email, phone_number, status = 'confirmed' } = req.body;
 
-    try {
-        const subscriber = await Subscriber.create({
-            first_name,
-            last_name,
-            email,
-            list_id,
-            status
-        });
+    return sendResponse(res, 201, req.body);
+    // try {
+    //     const subscriber = await Subscriber.create({
+    //         list_id,
+    //         first_name,
+    //         last_name,
+    //         phone_number,
+    //         email,
+    //         status
+    //     });
 
-        return sendResponse( res, 201, {
-            success: true,
-            message: "Subscriber created successfully",
-            subscriber
-        });
+    //     return sendResponse( res, 201, {
+    //         success: true,
+    //         message: "Subscriber created successfully",
+    //         subscriber
+    //     });
 
-    } catch (error: any) {
-        next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false }));
-    }
+    // } catch (error: any) {
+    //     next(new AppError({ message: 'Internal server error.', statusCode: 500, isOperational: false }));
+    // }
 };
 
 export const getSubscriber = async ( req: Request, res: Response, next: NextFunction ) => {
