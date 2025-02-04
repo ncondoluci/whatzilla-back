@@ -24,6 +24,7 @@ import {
 import {
     postList,
     getList,
+    getLists,
     patchList,
     deleteList
 } from '@/controllers/listController';
@@ -72,6 +73,7 @@ export {
     // Lists
     postList,
     getList,
+    getLists,
     patchList,
     deleteList,
 
